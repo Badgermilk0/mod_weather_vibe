@@ -1,935 +1,1154 @@
-#include "mod_wv_core.h"
+#include "mod_wv_engine.h"
+#include "mod_wv_world.h"
 
-#include "Config.h"
+#include "Chat.h"
+#include "DBCStores.h"
+#include "GameEventMgr.h"
 #include "Log.h"
-#include "ScriptMgr.h"
+#include "Map.h"
+#include "ObjectAccessor.h"
+#include "Player.h"
+#include "Random.h"
+#include "StringFormat.h"
+#include "WorldSession.h"
+#include "WorldSessionMgr.h"
 
 #include <algorithm>
-#include <cctype>
-#include <cstdlib>
-#include <ctime>
-#include <random>
-#include <sstream>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include <cmath>
+
+using namespace WeatherVibe;
 
 // ─────────────────────────────────────────────────────────────
-// RNG
+// Local helpers
 // ─────────────────────────────────────────────────────────────
 
-static std::mt19937& Rng()
+namespace
 {
-    static std::mt19937 rng(static_cast<uint32>(std::time(nullptr)));
-    return rng;
-}
+    // A grade change smaller than this is not worth a packet.
+    constexpr float RAW_EPSILON = 0.004f;
 
-static float RandFloat(float lo, float hi)
-{
-    if (lo >= hi) return lo;
-    return std::uniform_real_distribution<float>(lo, hi)(Rng());
-}
-
-static int RandInt(int lo, int hi)
-{
-    if (lo >= hi) return lo;
-    return std::uniform_int_distribution<int>(lo, hi)(Rng());
-}
-
-// ─────────────────────────────────────────────────────────────
-// Data structures
-// ─────────────────────────────────────────────────────────────
-
-// Single weighted weather entry (parsed from config).
-struct WeatherEntry
-{
-    uint32 weight = 0;
-    uint32 stateVal = 0;
-    float  intensMin = 30.0f;
-    float  intensMax = 100.0f;
-};
-
-using SeasonProfile = std::vector<WeatherEntry>;
-
-// Transition tuning (per profile, from config).
-struct TransitionSettings
-{
-    uint32 stepTimeMinMs = 15000;
-    uint32 stepTimeMaxMs = 30000;
-    uint32 changesPerHr = 6;
-    uint32 maxConsecSame = 3;
-    float  stepSizePct = 10.0f;
-    uint32 minHoldMs = 30000;         // minimum time weather lingers after arriving
-    uint32 seasonBlendMs = 600000;        // how long (ms) to blend with previous season after change
-};
-
-// Cross-state transition phase.
-enum class TransitionPhase : uint8 { NONE, FADE_OUT, FADE_IN };
-
-// Live transition state — shared by all zones using the same profile.
-struct TransitionState
-{
-    uint32 currentStateVal = WEATHER_STATE_FINE;
-    float  currentPct = 0.0f;
-
-    uint32 targetStateVal = WEATHER_STATE_FINE;
-    float  targetPct = 0.0f;
-
-    uint32 stepTimerMs = 0;
-    bool   inTransition = false;
-
-    uint32 intervalTimerMs = 0;
-    bool   waitingForInterval = false;
-
-    TransitionPhase phase = TransitionPhase::NONE;
-    bool   sameFamily = false;
-    bool   isUpgrade = false;
-    float  fadeOutPct = 0.0f;
-    float  fadeInPct = 0.0f;
-
-    uint32 changesThisHour = 0;
-    uint32 hourTimerMs = 3600000u;
-    uint32 consecSameCount = 0;
-
-    uint32 reapplyTimerMs = 0;          // counts down to next re-broadcast
-
-    // Season blending — smooth the transition when the season changes.
-    Season prevSeason = Season::SPRING;
-    Season blendFromSeason = Season::SPRING;   // the old season we're blending away from
-    bool   seasonBlending = false;
-    uint32 seasonBlendTimer = 0;          // counts down from seasonBlendMs
-    uint32 seasonBlendTotal = 0;          // snapshot of seasonBlendMs for ratio calc
-};
-
-// A named weather profile — loaded once, ticked once, broadcast to all mapped zones.
-struct WeatherProfile
-{
-    std::string         name;
-    SeasonProfile       seasons[4];
-    TransitionSettings  transition;
-    TransitionState     state;
-    std::vector<uint32> zoneIds;
-};
-
-// ─────────────────────────────────────────────────────────────
-// Engine state
-// ─────────────────────────────────────────────────────────────
-
-static std::vector<WeatherProfile> gProfiles;
-static uint32 gReapplyIntervalMs = 10000;     // WeatherVibe.Profile.ReApply.PerSec (seconds -> ms)
-
-// ─────────────────────────────────────────────────────────────
-// Config helpers
-// ─────────────────────────────────────────────────────────────
-
-static std::string Trim(std::string const& s)
-{
-    size_t b = s.find_first_not_of(" \t\r\n");
-    size_t e = s.find_last_not_of(" \t\r\n");
-    return (b == std::string::npos) ? "" : s.substr(b, e - b + 1);
-}
-
-static char const* SeasonKey(Season s)
-{
-    switch (s)
+    // Parse "weight,state,minPct,maxPct" from a config value.
+    bool ParseProfileEntry(std::string const& raw, WeatherEntry& out, bool& swapped)
     {
-    case Season::SPRING: return "Spring";
-    case Season::SUMMER: return "Summer";
-    case Season::AUTUMN: return "Autumn";
-    case Season::WINTER: return "Winter";
-    default:             return "Spring";
+        std::vector<std::string> parts = Split(raw, ',');
+        if (parts.size() != 4)
+            return false;
+
+        float weight = 0.0f, minPct = 0.0f, maxPct = 0.0f;
+        WeatherState state = WEATHER_STATE_FINE;
+
+        if (!ParseFloat(parts[0], weight) || !WeatherVibeCore::ParseState(parts[1], state) ||
+            !ParseFloat(parts[2], minPct) || !ParseFloat(parts[3], maxPct))
+            return false;
+
+        swapped = maxPct < minPct;
+        if (swapped) std::swap(minPct, maxPct);
+
+        out.weight = weight;
+        out.state = state;
+        out.minPct = std::clamp(minPct, 0.0f, 100.0f);
+        out.maxPct = std::clamp(maxPct, 0.0f, 100.0f);
+        return out.weight > 0.0f;
+    }
+
+    // Where a transition stands at progress t (0..1): eased, so it starts and ends gently.
+    void Evaluate(TransitionPlan const& plan, float t, WeatherState& state, float& raw)
+    {
+        t = std::clamp(t, 0.0f, 1.0f);
+        float const eased = t * t * (3.0f - 2.0f * t);
+
+        if (plan.legCount < 2 || eased < plan.split)
+        {
+            Leg const& leg = plan.legs[0];
+            float const k = (plan.legCount < 2) ? eased : eased / plan.split;
+            state = leg.state;
+            raw = leg.from + (leg.to - leg.from) * k;
+            return;
+        }
+
+        Leg const& leg = plan.legs[1];
+        float const k = (eased - plan.split) / (1.0f - plan.split);
+        state = leg.state;
+        raw = leg.from + (leg.to - leg.from) * k;
+    }
+
+    std::string Duration(uint32 ms)
+    {
+        uint32 const seconds = ms / 1000;
+        if (seconds >= 60)
+            return Acore::StringFormat("{}m{:02}s", seconds / 60, seconds % 60);
+        return Acore::StringFormat("{}s", seconds);
+    }
+
+    // The top-level zone an area belongs to (itself, when it is one).
+    uint32 ZoneOfArea(uint32 areaId)
+    {
+        AreaTableEntry const* area = sAreaTableStore.LookupEntry(areaId);
+        if (!area)
+            return 0;
+        return area->zone ? area->zone : area->ID;
     }
 }
 
-// Parse "weight,state,minPct,maxPct" from a config line.
-static bool ParseProfileEntry(std::string const& raw, WeatherEntry& out)
+// ─────────────────────────────────────────────────────────────
+// Singleton
+// ─────────────────────────────────────────────────────────────
+
+WeatherVibeEngine& WeatherVibeEngine::Instance()
 {
-    float w = 0, sv = 0, mn = 30.0f, mx = 100.0f;
-    if (std::sscanf(raw.c_str(), " %f , %f , %f , %f ", &w, &sv, &mn, &mx) != 4)
+    static WeatherVibeEngine instance;
+    return instance;
+}
+
+void WeatherVibeEngine::Clear()
+{
+    _profiles.clear();
+    _zoneToProfile.clear();
+    _areaToProfile.clear();
+    _anyDirty = false;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Load — profiles and mappings from config
+// ─────────────────────────────────────────────────────────────
+
+void WeatherVibeEngine::LoadGlobals(ConfigView const& cfg)
+{
+    _autoEngine = sWeatherVibeCore.IsProfileEnabled();
+    _rules.strict = cfg.Bool("WeatherVibe.Escalation.Strict", true);
+    _rules.fogBridge = std::clamp(cfg.Float("WeatherVibe.FogBridge.Boost", 1.5f), 0.0f, 10.0f);
+    _pace = std::clamp(cfg.Float("WeatherVibe.Pace", 1.0f), 0.1f, 10.0f);
+    _frontStrength = std::clamp(cfg.Float("WeatherVibe.Front.Strength", 1.5f), 0.0f, 10.0f);
+    _tickMs = std::clamp(cfg.UInt("WeatherVibe.Transition.TickSeconds", 4), 1u, 60u) * 1000;
+
+    // Legacy safety net; delivery no longer depends on it.
+    _reapplyMs = cfg.UInt("WeatherVibe.Profile.ReApply.PerSec", 0) * 1000;
+    _reapplyTimerMs = _reapplyMs;
+
+    // Storms pass, fine spells linger.
+    static constexpr float kDefaultHold[WV_STATES] =
+    {
+        1.50f,                 // Fine
+        1.25f,                 // Fog
+        1.00f, 1.00f, 0.75f,   // rain
+        1.00f, 1.00f, 0.75f,   // snow
+        1.00f, 1.00f, 0.75f,   // sandstorm
+        0.60f                  // Thunders
+    };
+
+    for (size_t i = 0; i < WV_STATES; ++i)
+    {
+        char const* stateName = WeatherVibeCore::WeatherStateName(WeatherVibeCore::StateAt(i));
+
+        _holdMult[i] = std::clamp(cfg.Float(std::string("WeatherVibe.Hold.") + stateName, kDefaultHold[i]), 0.1f, 10.0f);
+
+        for (size_t dp = 0; dp < WV_DAYPARTS; ++dp)
+        {
+            std::string key = std::string("WeatherVibe.DayPartWeight.")
+                + WeatherVibeCore::DayPartTokenUpper(DayPart(dp)) + "." + stateName;
+            _dayPartWeight[dp][i] = std::max(0.0f, cfg.Float(key, 1.0f));
+        }
+    }
+}
+
+bool WeatherVibeEngine::LoadProfile(ConfigView const& cfg, Profile& profile) const
+{
+    std::string const base = "WeatherVibe.Profile." + profile.name + ".";
+    bool anyEntries = false;
+
+    for (size_t s = 0; s < WV_SEASONS; ++s)
+    {
+        std::string const seasonKey = base + WeatherVibeCore::SeasonName(Season(s));
+
+        for (auto const& [index, value] : cfg.Numbered(seasonKey))
+        {
+            WeatherEntry entry;
+            bool swapped = false;
+
+            if (!ParseProfileEntry(value, entry, swapped))
+            {
+                LOG_WARN("server.loading", "[WeatherVibe] bad entry '{}.{} = {}' (want weight,state,minPct,maxPct)",
+                    seasonKey, index, value);
+                continue;
+            }
+
+            if (swapped)
+                LOG_WARN("server.loading", "[WeatherVibe] '{}.{} = {}' has its minimum above its maximum (typo?), using {:.0f}-{:.0f}",
+                    seasonKey, index, value, entry.minPct, entry.maxPct);
+
+            profile.seasons[s].push_back(entry);
+            anyEntries = true;
+        }
+    }
+
+    if (!anyEntries)
         return false;
 
-    if (mx < mn) std::swap(mn, mx);
+    auto key = [&](char const* suffix) { return base + "Transition." + suffix; };
 
-    out.weight = static_cast<uint32>(w);
-    out.stateVal = static_cast<uint32>(sv);
-    out.intensMin = std::clamp(mn, 0.0f, 100.0f);
-    out.intensMax = std::clamp(mx, 0.0f, 100.0f);
-    return out.weight > 0 && WeatherVibeCore::IsValidWeatherState(out.stateVal);
-}
+    uint32 stepMin = cfg.UInt(key("Step.TimeSeconds.Min"), 15);
+    uint32 stepMax = cfg.UInt(key("Step.TimeSeconds.Max"), 30);
+    if (stepMax < stepMin) std::swap(stepMin, stepMax);
 
-// Read numbered config keys: baseKey.1, baseKey.2, ... (via GetKeysByString).
-static std::vector<std::string> GetMultiOption(std::string const& baseKey)
-{
-    std::vector<std::string> results;
-    std::string prefix = baseKey + ".";
+    TransitionSettings& ts = profile.transition;
+    ts.stepTimeMinMs = stepMin * 1000;
+    ts.stepTimeMaxMs = stepMax * 1000;
+    ts.stepSizePct = std::clamp(cfg.Float(key("StepSize.Perc"), 10.0f), 0.5f, 50.0f);
+    ts.changesPerHr = std::clamp(cfg.UInt(key("Max.Changes.Per.Hour"), 6), 1u, 120u);
+    ts.maxConsecSame = cfg.UInt(key("Max.Consecutive.Same"), 3);
+    ts.minHoldMs = cfg.UInt(key("MinHoldSeconds"), 30) * 1000;
 
-    std::vector<std::string> keys = sConfigMgr->GetKeysByString(prefix);
-
-    std::vector<uint32> indices;
-    for (auto const& key : keys)
+    // Time-of-day pattern: the global table, unless this profile says otherwise.
+    for (size_t dp = 0; dp < WV_DAYPARTS; ++dp)
     {
-        std::string suffix = key.substr(prefix.size());
-        char* end = nullptr;
-        unsigned long idx = std::strtoul(suffix.c_str(), &end, 10);
-        if (end != suffix.c_str() && *end == '\0' && idx > 0)
-            indices.push_back(static_cast<uint32>(idx));
+        for (size_t i = 0; i < WV_STATES; ++i)
+        {
+            std::string overrideKey = base + "DayPartWeight." + WeatherVibeCore::DayPartTokenUpper(DayPart(dp))
+                + "." + WeatherVibeCore::WeatherStateName(WeatherVibeCore::StateAt(i));
+
+            profile.dayPartWeight[dp][i] = cfg.Has(overrideKey)
+                ? std::max(0.0f, cfg.Float(overrideKey, _dayPartWeight[dp][i]))
+                : _dayPartWeight[dp][i];
+        }
     }
 
-    std::sort(indices.begin(), indices.end());
-
-    for (uint32 idx : indices)
-    {
-        std::ostringstream oss;
-        oss << baseKey << "." << idx;
-        std::string val = Trim(sConfigMgr->GetOption<std::string>(oss.str(), ""));
-        if (!val.empty()) results.push_back(val);
-    }
-
-    return results;
-}
-
-// Parse "zoneId,ProfileName" from a config value.
-static bool ParseZoneMapping(std::string const& raw, uint32& outZoneId, std::string& outName)
-{
-    size_t comma = raw.find(',');
-    if (comma == std::string::npos || comma == 0) return false;
-
-    std::string zoneStr = Trim(raw.substr(0, comma));
-    std::string name = Trim(raw.substr(comma + 1));
-    if (zoneStr.empty() || name.empty()) return false;
-
-    char* end = nullptr;
-    unsigned long z = std::strtoul(zoneStr.c_str(), &end, 10);
-    if (end == zoneStr.c_str() || z == 0) return false;
-
-    outZoneId = static_cast<uint32>(z);
-    outName = name;
     return true;
 }
 
-static TransitionSettings LoadTransitionSettings(std::string const& profileName)
+void WeatherVibeEngine::LoadNeighbors(ConfigView const& cfg)
 {
-    TransitionSettings ts;
-
-    auto key = [&](char const* suffix) {
-        return "WeatherVibe.Profile." + profileName + ".Transition." + suffix;
+    auto link = [](Profile& profile, uint16 other)
+        {
+            if (std::find(profile.neighbors.begin(), profile.neighbors.end(), other) == profile.neighbors.end())
+                profile.neighbors.push_back(other);
         };
 
-    uint32 stepMin = sConfigMgr->GetOption<uint32>(key("Step.TimeSeconds.Min"), 15);
-    uint32 stepMax = sConfigMgr->GetOption<uint32>(key("Step.TimeSeconds.Max"), 30);
-    if (stepMax < stepMin) std::swap(stepMin, stepMax);
-
-    ts.stepTimeMinMs = stepMin * 1000;
-    ts.stepTimeMaxMs = stepMax * 1000;
-    ts.changesPerHr = std::max(1u, sConfigMgr->GetOption<uint32>(key("Max.Changes.Per.Hour"), 6));
-    ts.maxConsecSame = sConfigMgr->GetOption<uint32>(key("Max.Consecutive.Same"), 3);
-    ts.stepSizePct = std::clamp(sConfigMgr->GetOption<float>(key("StepSize.Perc"), 10.0f), 0.5f, 50.0f);
-    ts.minHoldMs = sConfigMgr->GetOption<uint32>(key("MinHoldSeconds"), 30) * 1000;
-    ts.seasonBlendMs = std::min(sConfigMgr->GetOption<uint32>(key("SeasonBlendMinutes"), 10), 60u) * 60u * 1000u;
-
-    return ts;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Weather family & tier classification
-// ─────────────────────────────────────────────────────────────
-
-enum class WeatherFamily : uint8 { FINE, FOG, RAIN, SNOW, SANDSTORM, THUNDER, UNKNOWN };
-
-static WeatherFamily GetWeatherFamily(uint32 sv)
-{
-    switch (sv)
+    for (uint16 i = 0; i < _profiles.size(); ++i)
     {
-    case WEATHER_STATE_FINE:             return WeatherFamily::FINE;
-    case WEATHER_STATE_FOG:              return WeatherFamily::FOG;
-    case WEATHER_STATE_LIGHT_RAIN:
-    case WEATHER_STATE_MEDIUM_RAIN:
-    case WEATHER_STATE_HEAVY_RAIN:       return WeatherFamily::RAIN;
-    case WEATHER_STATE_LIGHT_SNOW:
-    case WEATHER_STATE_MEDIUM_SNOW:
-    case WEATHER_STATE_HEAVY_SNOW:       return WeatherFamily::SNOW;
-    case WEATHER_STATE_LIGHT_SANDSTORM:
-    case WEATHER_STATE_MEDIUM_SANDSTORM:
-    case WEATHER_STATE_HEAVY_SANDSTORM:  return WeatherFamily::SANDSTORM;
-    case WEATHER_STATE_THUNDERS:         return WeatherFamily::THUNDER;
-    default:                             return WeatherFamily::UNKNOWN;
-    }
-}
-
-static bool IsSameFamily(uint32 a, uint32 b)
-{
-    WeatherFamily fa = GetWeatherFamily(a);
-    WeatherFamily fb = GetWeatherFamily(b);
-    if (fa == WeatherFamily::FINE || fa == WeatherFamily::FOG ||
-        fa == WeatherFamily::THUNDER || fa == WeatherFamily::UNKNOWN)
-        return false;
-    return fa == fb;
-}
-
-// Intensity tier: 0 = standalone, 1 = light, 2 = medium, 3 = heavy.
-static uint8 GetWeatherTier(uint32 sv)
-{
-    switch (sv)
-    {
-    case WEATHER_STATE_FINE:
-    case WEATHER_STATE_FOG:
-    case WEATHER_STATE_THUNDERS:           return 0;
-    case WEATHER_STATE_LIGHT_RAIN:
-    case WEATHER_STATE_LIGHT_SNOW:
-    case WEATHER_STATE_LIGHT_SANDSTORM:    return 1;
-    case WEATHER_STATE_MEDIUM_RAIN:
-    case WEATHER_STATE_MEDIUM_SNOW:
-    case WEATHER_STATE_MEDIUM_SANDSTORM:   return 2;
-    case WEATHER_STATE_HEAVY_RAIN:
-    case WEATHER_STATE_HEAVY_SNOW:
-    case WEATHER_STATE_HEAVY_SANDSTORM:    return 3;
-    default:                               return 0;
-    }
-}
-
-static bool IsUpgrade(uint32 current, uint32 target)
-{
-    return GetWeatherTier(target) > GetWeatherTier(current);
-}
-
-// Natural escalation: standalone always reachable, +/-1 tier within family,
-// cross-family only at tier 1.
-static bool IsNaturalTransition(uint32 current, uint32 candidate)
-{
-    uint8 cTier = GetWeatherTier(candidate);
-    if (cTier == 0) return true;
-
-    uint8 curTier = GetWeatherTier(current);
-    if (curTier == 0) return cTier == 1;
-
-    if (GetWeatherFamily(current) == GetWeatherFamily(candidate))
-    {
-        int d = static_cast<int>(cTier) - static_cast<int>(curTier);
-        return d >= -1 && d <= 1;
-    }
-
-    return cTier == 1;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Fog bridge boost
-// ─────────────────────────────────────────────────────────────
-
-// Returns true when fog should be preferred as a natural bridge between
-// clear weather and precipitation (or vice versa).
-static bool ShouldBoostFog(uint32 currentState, uint32 candidateState)
-{
-    if (GetWeatherFamily(candidateState) != WeatherFamily::FOG)
-        return false;
-
-    WeatherFamily curFam = GetWeatherFamily(currentState);
-
-    // Fine -> Fog  (fog as "something's coming")
-    if (curFam == WeatherFamily::FINE)
-        return true;
-
-    // Light precipitation -> Fog  (fog as "clearing up")
-    if (GetWeatherTier(currentState) == 1 &&
-        (curFam == WeatherFamily::RAIN || curFam == WeatherFamily::SNOW ||
-            curFam == WeatherFamily::SANDSTORM))
-        return true;
-
-    return false;
-}
-
-static constexpr float FOG_BRIDGE_MULTIPLIER = 1.5f;
-
-// ─────────────────────────────────────────────────────────────
-// Weighted random selection (three-pass: natural+consec -> natural -> any)
-// ─────────────────────────────────────────────────────────────
-
-static WeatherEntry const* PickEntry(SeasonProfile const& profile, uint32 currentState,
-    uint32 maxConsecSame, uint32 consecCount)
-{
-    if (profile.empty()) return nullptr;
-
-    bool excludeConsec = (consecCount >= maxConsecSame);
-
-    for (int pass = 0; pass < 3; ++pass)
-    {
-        std::vector<size_t> eligible;
-        std::vector<uint32> effectiveWeights;
-        uint32 totalWeight = 0;
-
-        for (size_t i = 0; i < profile.size(); ++i)
-        {
-            if (pass < 2 && !IsNaturalTransition(currentState, profile[i].stateVal))
-                continue;
-            if (pass == 0 && excludeConsec && profile[i].stateVal == currentState)
-                continue;
-
-            uint32 w = profile[i].weight;
-
-            // Boost fog when it serves as a natural bridge between clear
-            // skies and precipitation (or vice versa).
-            if (ShouldBoostFog(currentState, profile[i].stateVal))
-                w = static_cast<uint32>(static_cast<float>(w) * FOG_BRIDGE_MULTIPLIER);
-
-            eligible.push_back(i);
-            effectiveWeights.push_back(w);
-            totalWeight += w;
-        }
-
-        if (eligible.empty() || totalWeight == 0)
+        std::string const listKey = "WeatherVibe.Profile." + _profiles[i].name + ".Neighbors";
+        std::string const list = cfg.Text(listKey);
+        if (list.empty())
             continue;
 
-        uint32 roll = std::uniform_int_distribution<uint32>(0, totalWeight - 1)(Rng());
-        uint32 acc = 0;
-        for (size_t j = 0; j < eligible.size(); ++j)
+        for (std::string const& name : Split(list, ','))
         {
-            acc += effectiveWeights[j];
-            if (roll < acc) return &profile[eligible[j]];
+            if (name.empty())
+                continue;
+
+            Profile* other = FindProfile(name);
+            if (!other)
+            {
+                LOG_WARN("server.loading", "[WeatherVibe] '{}' names unknown neighbour '{}'", listKey, name);
+                continue;
+            }
+
+            uint16 const j = uint16(other - _profiles.data());
+            if (j == i)
+                continue;
+
+            // Borders have two sides: naming a neighbour once is enough.
+            link(_profiles[i], j);
+            link(_profiles[j], i);
         }
-        return &profile[eligible.back()];
+    }
+}
+
+void WeatherVibeEngine::ValidateProfile(Profile const& profile) const
+{
+    // A medium or heavy tier with nothing lighter beneath it can only be reached by breaking
+    // the escalation rule, so in practice it almost never appears.
+    static constexpr WeatherState kLadders[3][3] =
+    {
+        { WEATHER_STATE_LIGHT_RAIN,      WEATHER_STATE_MEDIUM_RAIN,      WEATHER_STATE_HEAVY_RAIN },
+        { WEATHER_STATE_LIGHT_SNOW,      WEATHER_STATE_MEDIUM_SNOW,      WEATHER_STATE_HEAVY_SNOW },
+        { WEATHER_STATE_LIGHT_SANDSTORM, WEATHER_STATE_MEDIUM_SANDSTORM, WEATHER_STATE_HEAVY_SANDSTORM }
+    };
+
+    for (size_t s = 0; s < WV_SEASONS; ++s)
+    {
+        WeatherTable const& table = profile.seasons[s];
+        auto has = [&](WeatherState state)
+            {
+                return std::any_of(table.begin(), table.end(), [&](WeatherEntry const& e) { return e.state == state; });
+            };
+
+        for (auto const& ladder : kLadders)
+        {
+            for (int tier = 1; tier < 3; ++tier)
+            {
+                if (has(ladder[tier]) && !has(ladder[tier - 1]))
+                    LOG_WARN("server.loading", "[WeatherVibe] {}.{}: {} has no {} below it and will rarely be reached",
+                        profile.name, WeatherVibeCore::SeasonName(Season(s)),
+                        WeatherVibeCore::WeatherStateName(ladder[tier]),
+                        WeatherVibeCore::WeatherStateName(ladder[tier - 1]));
+            }
+        }
+    }
+}
+
+void WeatherVibeEngine::Load(ConfigView const& cfg, bool reload)
+{
+    std::vector<Profile> previous = std::move(_profiles);
+    Clear();
+
+    LoadGlobals(cfg);
+
+    // ── Mappings: a profile exists for every name a zone or an area points at ──
+    struct Mapped { std::vector<uint32> zones; std::vector<uint32> areas; };
+    std::vector<std::string> order;
+    std::unordered_map<std::string, Mapped> mapped;
+
+    auto readMappings = [&](char const* baseKey, bool isArea)
+        {
+            for (auto const& [index, value] : cfg.Numbered(baseKey))
+            {
+                std::vector<std::string> parts = Split(value, ',');
+                uint32 id = 0;
+
+                if (parts.size() != 2 || !ParseUInt(parts[0], id) || id == 0 || parts[1].empty())
+                {
+                    LOG_WARN("server.loading", "[WeatherVibe] bad mapping '{}.{} = {}' (want <id>,<ProfileName>)",
+                        baseKey, index, value);
+                    continue;
+                }
+
+                auto [it, inserted] = mapped.try_emplace(parts[1]);
+                if (inserted)
+                    order.push_back(parts[1]);
+
+                (isArea ? it->second.areas : it->second.zones).push_back(id);
+            }
+        };
+
+    readMappings("WeatherVibe.ZoneProfile", false);
+    readMappings("WeatherVibe.AreaProfile", true);
+
+    if (order.empty())
+    {
+        LOG_INFO("server.loading", "[WeatherVibe] no zone profiles configured");
+        return;
     }
 
-    return nullptr;
+    for (std::string const& name : order)
+    {
+        Profile profile;
+        profile.name = name;
+        profile.zoneIds = mapped[name].zones;
+        profile.areaIds = mapped[name].areas;
+
+        if (!LoadProfile(cfg, profile))
+        {
+            LOG_WARN("server.loading", "[WeatherVibe] profile '{}' has no entries, skipping", name);
+            continue;
+        }
+
+        _profiles.push_back(std::move(profile));
+    }
+
+    // ── Holiday overlays: WeatherVibe.Holiday.<holidayId>.<Profile>.<N> ──
+    {
+        std::string const prefix = "WeatherVibe.Holiday.";
+        for (std::string const& key : cfg.KeysWithPrefix(prefix))
+        {
+            std::vector<std::string> parts = Split(key.substr(prefix.size()), '.');
+            uint32 holidayId = 0, index = 0;
+            std::string const value = cfg.Text(key);
+
+            if (parts.size() != 3 || !ParseUInt(parts[0], holidayId) || !ParseUInt(parts[2], index))
+            {
+                LOG_WARN("server.loading", "[WeatherVibe] bad holiday key '{}' (want WeatherVibe.Holiday.<holidayId>.<Profile>.<N>)", key);
+                continue;
+            }
+
+            Profile* profile = FindProfile(parts[1]);
+            HolidayEntry holiday;
+            bool swapped = false;
+            holiday.holidayId = holidayId;
+
+            if (!profile || !ParseProfileEntry(value, holiday.entry, swapped))
+            {
+                LOG_WARN("server.loading", "[WeatherVibe] holiday entry '{} = {}' ignored ({})", key, value,
+                    profile ? "want weight,state,minPct,maxPct" : "unknown profile");
+                continue;
+            }
+
+            profile->holidays.push_back(holiday);
+        }
+    }
+
+    // ── Lookups, with a look at whether each id means what the conf thinks it means ──
+    for (uint16 i = 0; i < _profiles.size(); ++i)
+    {
+        Profile const& profile = _profiles[i];
+
+        for (uint32 zoneId : profile.zoneIds)
+        {
+            AreaTableEntry const* area = sAreaTableStore.LookupEntry(zoneId);
+            if (!area)
+                LOG_WARN("server.loading", "[WeatherVibe] zone {} ('{}') is not in AreaTable, so this mapping does nothing",
+                    zoneId, profile.name);
+            else if (area->zone)
+                LOG_WARN("server.loading", "[WeatherVibe] {} '{}' ('{}') is a sub-area of zone {}; map it with WeatherVibe.AreaProfile instead",
+                    zoneId, WeatherVibeCore::AreaName(zoneId), profile.name, area->zone);
+
+            auto [it, inserted] = _zoneToProfile.try_emplace(zoneId, i);
+            if (!inserted)
+            {
+                LOG_WARN("server.loading", "[WeatherVibe] zone {} is mapped to both '{}' and '{}'; using '{}'",
+                    zoneId, _profiles[it->second].name, profile.name, profile.name);
+                it->second = i;
+            }
+        }
+
+        for (uint32 areaId : profile.areaIds)
+        {
+            AreaTableEntry const* area = sAreaTableStore.LookupEntry(areaId);
+            if (!area)
+                LOG_WARN("server.loading", "[WeatherVibe] area {} ('{}') is not in AreaTable, so this mapping does nothing",
+                    areaId, profile.name);
+
+            auto [it, inserted] = _areaToProfile.try_emplace(areaId, i);
+            if (!inserted)
+            {
+                LOG_WARN("server.loading", "[WeatherVibe] area {} is mapped to both '{}' and '{}'; using '{}'",
+                    areaId, _profiles[it->second].name, profile.name, profile.name);
+                it->second = i;
+            }
+        }
+    }
+
+    LoadNeighbors(cfg);
+
+    // ── Live weather: carried over by name on a reload, otherwise the world starts mid-weather ──
+    uint32 const resync = sWeatherVibeWorld.GetResyncMs();
+    uint32 carried = 0;
+
+    for (size_t i = 0; i < _profiles.size(); ++i)
+    {
+        Profile& profile = _profiles[i];
+
+        auto old = std::find_if(previous.begin(), previous.end(),
+            [&](Profile const& p) { return p.name == profile.name; });
+
+        if (reload && old != previous.end() && old->live.started)
+        {
+            profile.live = old->live;
+            ++carried;
+        }
+        else
+            WarmStart(profile);
+
+        // Spread the re-announcements so they do not all land on one tick.
+        if (resync && !(reload && old != previous.end()))
+            profile.live.resyncTimerMs = uint32(uint64(resync) * i / _profiles.size());
+
+        ValidateProfile(profile);
+
+        std::string where;
+        for (uint32 zoneId : profile.zoneIds) { where += where.empty() ? "" : ", "; where += std::to_string(zoneId); }
+        for (uint32 areaId : profile.areaIds) { where += where.empty() ? "area " : ", area "; where += std::to_string(areaId); }
+
+        LOG_INFO("server.loading", "[WeatherVibe] profile '{}' -> [{}], {} neighbour(s), starts on {}",
+            profile.name, where, profile.neighbors.size(),
+            profile.live.started ? WeatherVibeCore::WeatherStateName(profile.live.state) : "nothing (no usable entries)");
+    }
+
+    LOG_INFO("server.loading", "[WeatherVibe] {} profile(s) active, {} zone(s), {} area(s){}",
+        _profiles.size(), _zoneToProfile.size(), _areaToProfile.size(),
+        reload ? Acore::StringFormat(", {} kept their weather", carried) : std::string());
+
+    if (!reload)
+        return;
+
+    // Mappings may have moved under people's feet: tell every client where it stands now.
+    for (auto const& [accountId, session] : sWorldSessionMgr->GetAllSessions())
+    {
+        Player* player = session->GetPlayer();
+        if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->IsBeingTeleported())
+            continue;
+
+        SendCurrentTo(player, player->GetZoneId(), player->GetAreaId());
+    }
+}
+
+// The world should already have weather when the first player logs in, and not the same
+// weather everywhere: settle each profile on a weighted pick, part-way through its hold.
+void WeatherVibeEngine::WarmStart(Profile& profile)
+{
+    LiveState& live = profile.live;
+    live = LiveState{};
+
+    WeatherState state = WEATHER_STATE_FINE;
+    float pct = 100.0f;
+
+    if (_autoEngine)
+    {
+        WeatherTable table;
+        BuildTable(profile, table, false);
+
+        int const index = PickWeighted(table);
+        if (index < 0)
+            return;
+
+        state = table[size_t(index)].state;
+        pct = frand(table[size_t(index)].minPct, table[size_t(index)].maxPct);
+    }
+
+    live.started = true;
+    live.state = live.targetState = live.settledState = state;
+    live.targetPct = pct;
+    live.raw = live.targetRaw = sWeatherVibeCore.PercentToRaw(sWeatherVibeCore.GetCurrentDayPart(), state, pct);
+    live.phase = Phase::HOLD;
+    live.holdMs = uint32(float(CalcHoldMs(profile, state, 0)) * frand(0.15f, 1.0f));
+}
+
+// ─────────────────────────────────────────────────────────────
+// What may come next: the effective table for a profile right now
+// ─────────────────────────────────────────────────────────────
+
+void WeatherVibeEngine::BuildTable(Profile const& profile, WeatherTable& out, bool useFronts) const
+{
+    out.clear();
+
+    // ── Season: this season's rows, with the neighbouring season mixed in near its boundary ──
+    SeasonBlend const blend = sWeatherVibeCore.GetSeasonBlend();
+    WeatherTable const* primary = &profile.seasons[size_t(blend.primary)];
+    WeatherTable const* secondary = &profile.seasons[size_t(blend.secondary)];
+    float share = (blend.secondary == blend.primary || secondary->empty()) ? 0.0f : blend.secondaryShare;
+
+    if (primary->empty())
+    {
+        // A profile may leave a season out; borrow another rather than stall.
+        share = 0.0f;
+        if (!secondary->empty())
+            primary = secondary;
+        else
+            for (WeatherTable const& table : profile.seasons)
+                if (!table.empty()) { primary = &table; break; }
+    }
+
+    for (WeatherEntry const& entry : *primary)
+    {
+        out.push_back(entry);
+        out.back().weight *= (1.0f - share);
+    }
+
+    if (share > 0.0f)
+    {
+        for (WeatherEntry const& entry : *secondary)
+        {
+            out.push_back(entry);
+            out.back().weight *= share;
+        }
+    }
+
+    // ── Holidays add their own rows while they run ──
+    for (HolidayEntry const& holiday : profile.holidays)
+        if (IsHolidayActive(HolidayIds(holiday.holidayId)))
+            out.push_back(holiday.entry);
+
+    // ── Time of day ──
+    size_t const dp = size_t(sWeatherVibeCore.GetCurrentDayPart());
+    for (WeatherEntry& entry : out)
+    {
+        int const index = WeatherVibeCore::StateIndex(entry.state);
+        if (index >= 0)
+            entry.weight *= profile.dayPartWeight[dp][size_t(index)];
+    }
+
+    // ── Fronts: heavy weather next door makes the same kind of weather likelier here.
+    //    Only rows the table already has are boosted, so a desert never inherits snow. ──
+    if (!useFronts || _frontStrength <= 0.0f || profile.neighbors.empty())
+        return;
+
+    float rain = 0.0f, snow = 0.0f, sand = 0.0f;
+
+    for (uint16 index : profile.neighbors)
+    {
+        LiveState const& other = _profiles[index].live;
+        if (!other.started)
+            continue;
+
+        if (other.targetState == WEATHER_STATE_THUNDERS)
+        {
+            rain += 1.0f;
+            continue;
+        }
+
+        if (GetTier(other.targetState) < 2)
+            continue;
+
+        switch (GetFamily(other.targetState))
+        {
+        case Family::RAIN:      rain += 1.0f; break;
+        case Family::SNOW:      snow += 1.0f; break;
+        case Family::SANDSTORM: sand += 1.0f; break;
+        default: break;
+        }
+    }
+
+    float const count = float(profile.neighbors.size());
+
+    for (WeatherEntry& entry : out)
+    {
+        float pressure = 0.0f;
+
+        switch (GetFamily(entry.state))
+        {
+        case Family::RAIN:
+        case Family::THUNDER:   pressure = rain / count; break;
+        case Family::SNOW:      pressure = snow / count; break;
+        case Family::SANDSTORM: pressure = sand / count; break;
+        default: break;
+        }
+
+        entry.weight *= 1.0f + _frontStrength * pressure;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
 // Scheduling & transition
 // ─────────────────────────────────────────────────────────────
 
-// Calculate interval between weather selections (~3600000/changesPerHr, +/-25%).
-static uint32 CalcSelectionIntervalMs(TransitionSettings const& ts)
+// Plan the way from one weather to another in raw-grade space.
+//   same state:       the grade simply moves.
+//   continuous pair:  the grade moves straight across and the state id swaps halfway — Light at
+//                     0.45 and Medium at 0.45 draw the same density, so nothing jumps.
+//   anything else:    the old weather eases to its faintest, the new one builds from its faintest.
+//                     For Fine "faintest" is its most overcast, which is where precipitation starts.
+// The duration still comes from the profile's Step.* keys: one old-style step per StepSize.Perc
+// of intensity travelled.
+TransitionPlan WeatherVibeEngine::PlanTransition(TransitionSettings const& ts, DayPart dp,
+    WeatherState fromState, float fromRaw, WeatherState toState, float toPct, float toRaw) const
 {
-    uint32 baseMs = 3600000u / ts.changesPerHr;
-    int lo = static_cast<int>(baseMs * 75 / 100);
-    int hi = static_cast<int>(baseMs * 125 / 100);
-    if (lo < 1000) lo = 1000;
-    if (hi < lo)   hi = lo;
-    return static_cast<uint32>(RandInt(lo, hi));
-}
+    TransitionPlan plan;
+    float const fromPct = sWeatherVibeCore.RawToPercent(dp, fromState, fromRaw);
+    float travelPct = 0.0f;
 
-// Broadcast weather to all zones mapped to this profile (keeps them synced).
-static void BroadcastWeather(WeatherProfile const& prof, WeatherState state, float pct)
-{
-    for (uint32 zoneId : prof.zoneIds)
-        sWeatherVibeCore.PushWeatherPercent(zoneId, state, pct);
-}
-
-// Broadcast a debug message to all zones mapped to this profile.
-static void BroadcastDebugText(WeatherProfile const& prof, char const* text)
-{
-    for (uint32 zoneId : prof.zoneIds)
-        sWeatherVibeCore.BroadcastZoneText(zoneId, text);
-}
-
-// Step intensity toward a goal by fixed step size. Returns true when arrived.
-static bool StepToward(float& current, float goal, float stepSize)
-{
-    float remaining = goal - current;
-    if (std::abs(remaining) <= stepSize)
+    if (fromState == toState)
     {
-        current = goal;
-        return true;
+        if (std::fabs(toRaw - fromRaw) < RAW_EPSILON)
+            return plan;   // already there
+
+        plan.legCount = 1;
+        plan.split = 1.0f;
+        plan.legs[0] = { toState, fromRaw, toRaw };
+        travelPct = std::fabs(toPct - fromPct);
     }
-    current += (remaining > 0.0f ? stepSize : -stepSize);
-    return false;
-}
-
-// Forward declaration.
-static void ScheduleNextEvent(WeatherProfile& prof, Season season);
-
-// Ensure the interval timer has at least minHoldMs remaining so weather
-// lingers long enough for players to experience it after a transition.
-static void EnforceMinHold(TransitionState& st, TransitionSettings const& ts)
-{
-    if (ts.minHoldMs > 0 && st.intervalTimerMs < ts.minHoldMs)
-        st.intervalTimerMs = ts.minHoldMs;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Per-profile tick (called once per profile per server tick)
-// ─────────────────────────────────────────────────────────────
-
-static void TickProfile(WeatherProfile& prof, uint32 diff, Season season)
-{
-    TransitionState& st = prof.state;
-    TransitionSettings& ts = prof.transition;
-
-    // ── Season change detection ──
-    if (season != st.prevSeason)
+    else if (IsContinuousPair(fromState, toState))
     {
-        if (ts.seasonBlendMs > 0)
-        {
-            st.blendFromSeason = st.prevSeason;  // snapshot before overwrite
-            st.seasonBlending = true;
-            st.seasonBlendTimer = ts.seasonBlendMs;
-            st.seasonBlendTotal = ts.seasonBlendMs;
+        float const middle = (fromRaw + toRaw) * 0.5f;
 
-            if (sWeatherVibeCore.IsDebug())
-            {
-                LOG_INFO("server.loading",
-                    "[WeatherVibe] '{}' season changed {} -> {}, blending for {}s",
-                    prof.name, SeasonKey(st.prevSeason), SeasonKey(season),
-                    ts.seasonBlendMs / 1000);
+        plan.legCount = 2;
+        plan.split = 0.5f;
+        plan.legs[0] = { fromState, fromRaw, middle };
+        plan.legs[1] = { toState, middle, toRaw };
 
-                char buf[256];
-                snprintf(buf, sizeof(buf),
-                    "|cff00ff00[WeatherVibe]|r [DEBUG][P] season %s -> %s, blending %us",
-                    SeasonKey(st.prevSeason), SeasonKey(season),
-                    ts.seasonBlendMs / 1000);
-                BroadcastDebugText(prof, buf);
-            }
-        }
-        st.prevSeason = season;
-    }
-
-    // Tick down blend timer.
-    if (st.seasonBlending)
-    {
-        if (st.seasonBlendTimer <= diff)
-            st.seasonBlending = false;
-        else
-            st.seasonBlendTimer -= diff;
-    }
-
-    // Hourly counter reset.
-    if (st.hourTimerMs <= diff) { st.hourTimerMs = 3600000u; st.changesThisHour = 0; }
-    else { st.hourTimerMs -= diff; }
-
-    // Interval timer always counts down (during transitions AND hold).
-    st.intervalTimerMs = (st.intervalTimerMs > diff) ? st.intervalTimerMs - diff : 0;
-
-    // Waiting for interval after transition completed — hold at current weather.
-    if (st.waitingForInterval)
-    {
-        if (st.intervalTimerMs == 0)
-        {
-            st.waitingForInterval = false;
-
-            if (sWeatherVibeCore.IsDebug())
-            {
-                LOG_INFO("server.loading",
-                    "[WeatherVibe] '{}' interval expired, selecting next weather (changes {}/{})",
-                    prof.name, st.changesThisHour, ts.changesPerHr);
-
-                char buf[256];
-                snprintf(buf, sizeof(buf),
-                    "|cff00ff00[WeatherVibe]|r [DEBUG][P] interval expired, selecting next weather (changes %u/%u)",
-                    st.changesThisHour, ts.changesPerHr);
-                BroadcastDebugText(prof, buf);
-            }
-
-            ScheduleNextEvent(prof, season);
-        }
-        else if (gReapplyIntervalMs > 0)
-        {
-            // Periodic re-broadcast while holding — ensures late joiners /
-            // clients that lost state see the correct weather.  Never fires
-            // during an active transition (fade-out / fade-in / stepping).
-            if (st.reapplyTimerMs <= diff)
-            {
-                BroadcastWeather(prof,
-                    static_cast<WeatherState>(st.currentStateVal),
-                    std::clamp(st.currentPct, 0.0f, 100.0f));
-
-                st.reapplyTimerMs = gReapplyIntervalMs;
-
-                /* if (sWeatherVibeCore.IsDebug())
-                 {
-                     LOG_INFO("server.loading",
-                         "[WeatherVibe] '{}' reapply: {}% {}",
-                         prof.name, static_cast<int>(st.currentPct),
-                         WeatherVibeCore::WeatherStateName(
-                             static_cast<WeatherState>(st.currentStateVal)));
-
-                     char buf[256];
-                     snprintf(buf, sizeof(buf),
-                         "|cff00ff00[WeatherVibe]|r [DEBUG][P] reapply: %d%% %s",
-                         static_cast<int>(st.currentPct),
-                         WeatherVibeCore::WeatherStateName(
-                             static_cast<WeatherState>(st.currentStateVal)));
-                     BroadcastDebugText(prof, buf);
-                 }*/
-            }
-            else
-            {
-                st.reapplyTimerMs -= diff;
-            }
-        }
-        return;
-    }
-
-    // Nothing scheduled yet — first tick or after reset.
-    if (!st.inTransition)
-    {
-        ScheduleNextEvent(prof, season);
-        return;
-    }
-
-    // Step timer still running — wait.
-    if (st.stepTimerMs > diff) { st.stepTimerMs -= diff; return; }
-
-    auto nextStep = [&]() {
-        return static_cast<uint32>(RandInt(
-            static_cast<int>(ts.stepTimeMinMs), static_cast<int>(ts.stepTimeMaxMs)));
-        };
-
-    // ── Fade out: old state toward exit point ──
-    if (st.phase == TransitionPhase::FADE_OUT)
-    {
-        bool done = StepToward(st.currentPct, st.fadeOutPct, ts.stepSizePct);
-        BroadcastWeather(prof, static_cast<WeatherState>(st.currentStateVal),
-            std::clamp(st.currentPct, 0.0f, 100.0f));
-
-        if (done)
-        {
-            st.currentStateVal = st.targetStateVal;
-            st.currentPct = st.fadeInPct;
-            st.phase = TransitionPhase::FADE_IN;
-            st.stepTimerMs = 0;  // no gap between fadeOut and fadeIn
-        }
-        else { st.stepTimerMs = nextStep(); }
-        return;
-    }
-
-    // ── Fade in: new state toward target ──
-    if (st.phase == TransitionPhase::FADE_IN)
-    {
-        bool done = StepToward(st.currentPct, st.targetPct, ts.stepSizePct);
-        BroadcastWeather(prof, static_cast<WeatherState>(st.targetStateVal),
-            std::clamp(st.currentPct, 0.0f, 100.0f));
-
-        if (done)
-        {
-            st.phase = TransitionPhase::NONE;
-            st.currentStateVal = st.targetStateVal;
-            st.inTransition = false;
-            st.waitingForInterval = true;
-            EnforceMinHold(st, ts);
-
-            if (sWeatherVibeCore.IsDebug())
-            {
-                LOG_INFO("server.loading",
-                    "[WeatherVibe] '{}' fadeIn arrived at {}% {}, holding for {}ms, changes {}/{}",
-                    prof.name, static_cast<int>(st.currentPct),
-                    WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.currentStateVal)),
-                    st.intervalTimerMs, st.changesThisHour, ts.changesPerHr);
-
-                char buf[256];
-                snprintf(buf, sizeof(buf),
-                    "|cff00ff00[WeatherVibe]|r [DEBUG][P] fadeIn arrived at %d%% %s, holding %ums, changes %u/%u",
-                    static_cast<int>(st.currentPct),
-                    WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.currentStateVal)),
-                    st.intervalTimerMs, st.changesThisHour, ts.changesPerHr);
-                BroadcastDebugText(prof, buf);
-            }
-        }
-        else { st.stepTimerMs = nextStep(); }
-        return;
-    }
-
-    // ── Same-state: step toward target ──
-    bool arrived = StepToward(st.currentPct, st.targetPct, ts.stepSizePct);
-    BroadcastWeather(prof, static_cast<WeatherState>(st.targetStateVal),
-        std::clamp(st.currentPct, 0.0f, 100.0f));
-
-    if (arrived)
-    {
-        st.currentStateVal = st.targetStateVal;
-        st.inTransition = false;
-        st.waitingForInterval = true;
-        EnforceMinHold(st, ts);
-
-        if (sWeatherVibeCore.IsDebug())
-        {
-            LOG_INFO("server.loading",
-                "[WeatherVibe] '{}' arrived at {}% {}, holding for {}ms, changes {}/{}",
-                prof.name, static_cast<int>(st.currentPct),
-                WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.currentStateVal)),
-                st.intervalTimerMs, st.changesThisHour, ts.changesPerHr);
-
-            char buf[256];
-            snprintf(buf, sizeof(buf),
-                "|cff00ff00[WeatherVibe]|r [DEBUG][P] arrived at %d%% %s, holding %ums, changes %u/%u",
-                static_cast<int>(st.currentPct),
-                WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.currentStateVal)),
-                st.intervalTimerMs, st.changesThisHour, ts.changesPerHr);
-            BroadcastDebugText(prof, buf);
-        }
-    }
-    else { st.stepTimerMs = nextStep(); }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Schedule next weather selection for a profile
-// ─────────────────────────────────────────────────────────────
-
-static void ScheduleNextEvent(WeatherProfile& prof, Season season)
-{
-    TransitionState& st = prof.state;
-    TransitionSettings& ts = prof.transition;
-
-    // ── Build effective entry list, optionally blending two seasons ──
-    SeasonProfile const& currentEntries = prof.seasons[(size_t)season];
-
-    // During a season blend window, merge the previous season's entries with
-    // scaled-down weights so the transition feels gradual rather than instant.
-    SeasonProfile blended;
-    SeasonProfile const* entries = &currentEntries;
-
-    if (st.seasonBlending && st.seasonBlendTotal > 0)
-    {
-        SeasonProfile const& oldEntries = prof.seasons[(size_t)st.blendFromSeason];
-
-        if (!oldEntries.empty() && !currentEntries.empty())
-        {
-            // blendRatio: 1.0 right after the change, fading to 0.0 at end of window.
-            float blendRatio = static_cast<float>(st.seasonBlendTimer)
-                / static_cast<float>(st.seasonBlendTotal);
-            blendRatio = std::clamp(blendRatio, 0.0f, 1.0f);
-
-            // Start with the full current season entries.
-            blended = currentEntries;
-
-            // Append previous season entries with scaled weights.
-            for (auto const& old : oldEntries)
-            {
-                WeatherEntry scaled = old;
-                scaled.weight = static_cast<uint32>(
-                    static_cast<float>(old.weight) * blendRatio + 0.5f);
-                if (scaled.weight > 0)
-                    blended.push_back(scaled);
-            }
-
-            entries = &blended;
-        }
-    }
-
-    if (entries->empty()) return;
-
-    // Hourly budget exhausted — park until hour resets.
-    if (st.changesThisHour >= ts.changesPerHr)
-    {
-        st.waitingForInterval = true;
-        st.intervalTimerMs = st.hourTimerMs;
-        return;
-    }
-
-    WeatherEntry const* entry = PickEntry(*entries, st.currentStateVal,
-        ts.maxConsecSame, st.consecSameCount);
-    if (!entry) return;
-
-    bool samePick = (entry->stateVal == st.currentStateVal);
-    float targetPct = RandFloat(entry->intensMin, entry->intensMax);
-
-    st.consecSameCount = samePick ? st.consecSameCount + 1 : 1;
-    st.targetStateVal = entry->stateVal;
-    st.targetPct = targetPct;
-    st.inTransition = true;
-    st.waitingForInterval = false;
-    st.changesThisHour++;
-
-    // Interval timer = total time budget (fadeOut + fadeIn + hold at target).
-    st.intervalTimerMs = CalcSelectionIntervalMs(ts);
-
-    // Determine cross-state fade direction.
-    if (!samePick && st.currentPct > 0.0f)
-    {
-        st.sameFamily = IsSameFamily(st.currentStateVal, entry->stateVal);
-        st.isUpgrade = st.sameFamily && IsUpgrade(st.currentStateVal, entry->stateVal);
-        st.phase = TransitionPhase::FADE_OUT;
-
-        if (st.sameFamily)
-        {
-            // Same family upgrade:   old->100%, new starts at 0%
-            // Same family downgrade: old->0%,   new starts at 100%
-            st.fadeOutPct = st.isUpgrade ? 100.0f : 0.0f;
-            st.fadeInPct = st.isUpgrade ? 0.0f : 100.0f;
-        }
-        else
-        {
-            // Cross-family: old fades to 0%, new builds from 0%
-            st.fadeOutPct = 0.0f;
-            st.fadeInPct = 0.0f;
-        }
+        // The two states' percentages are not on one scale, so pace this by the grade itself:
+        // a change of kind is worth a few steps on its own, a full band's travel about as many again.
+        travelPct = 30.0f + std::min(100.0f, std::fabs(toRaw - fromRaw) * 250.0f);
     }
     else
     {
-        st.phase = TransitionPhase::NONE;
+        float const exitRaw = sWeatherVibeCore.PercentToRaw(dp, fromState, 0.0f);
+        float const entryRaw = sWeatherVibeCore.PercentToRaw(dp, toState, 0.0f);
+        float const out = std::fabs(fromRaw - exitRaw);
+        float const in = std::fabs(toRaw - entryRaw);
+
+        plan.legCount = 2;
+        plan.split = (out + in > 0.0001f) ? std::clamp(out / (out + in), 0.15f, 0.85f) : 0.5f;
+        plan.legs[0] = { fromState, fromRaw, exitRaw };
+        plan.legs[1] = { toState, entryRaw, toRaw };
+        travelPct = fromPct + toPct;
     }
 
-    st.stepTimerMs = static_cast<uint32>(RandInt(
-        static_cast<int>(ts.stepTimeMinMs), static_cast<int>(ts.stepTimeMaxMs)));
+    uint32 const steps = std::max(1u, uint32(std::ceil(travelPct / ts.stepSizePct)));
+    for (uint32 i = 0; i < steps; ++i)
+        plan.durationMs += urand(ts.stepTimeMinMs, ts.stepTimeMaxMs);
 
-    if (sWeatherVibeCore.IsDebug())
-    {
-        LOG_INFO("server.loading",
-            "[WeatherVibe] '{}' scheduled: {} -> {} at {}%, interval={}ms, phase={}",
-            prof.name,
-            WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.currentStateVal)),
-            WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.targetStateVal)),
-            static_cast<int>(st.targetPct), st.intervalTimerMs,
-            st.phase == TransitionPhase::FADE_OUT ? "fadeOut" :
-            st.phase == TransitionPhase::FADE_IN ? "fadeIn" : "direct");
-
-        char const* phaseStr = st.phase == TransitionPhase::FADE_OUT ? "fadeOut" :
-            st.phase == TransitionPhase::FADE_IN ? "fadeIn" : "direct";
-        char buf[256];
-        snprintf(buf, sizeof(buf),
-            "|cff00ff00[WeatherVibe]|r [DEBUG][P] scheduled: %s -> %s at %d%%, interval=%ums, phase=%s",
-            WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.currentStateVal)),
-            WeatherVibeCore::WeatherStateName(static_cast<WeatherState>(st.targetStateVal)),
-            static_cast<int>(st.targetPct), st.intervalTimerMs, phaseStr);
-        BroadcastDebugText(prof, buf);
-    }
+    return plan;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Init — load profiles and zone mappings from config
-// ─────────────────────────────────────────────────────────────
-
-void WeatherVibeEngine_Init()
+// The profile's interval between changes (~3600000/changesPerHr, +/-25%) is the whole budget:
+// transition plus hold. What is left after the transition is the hold, never less than
+// MinHoldSeconds, then stretched or shortened by the kind of weather it is.
+uint32 WeatherVibeEngine::CalcHoldMs(Profile const& profile, WeatherState state, uint32 transitionMs) const
 {
-    gProfiles.clear();
+    TransitionSettings const& ts = profile.transition;
 
-    // Load reapply interval (seconds → ms, 0 = disabled).
-    uint32 reapplySec = sConfigMgr->GetOption<uint32>("WeatherVibe.Profile.ReApply.PerSec", 10);
-    gReapplyIntervalMs = reapplySec * 1000;
+    float const interval = (3600000.0f / float(ts.changesPerHr)) * frand(0.75f, 1.25f) / _pace;
+    float hold = std::max(float(ts.minHoldMs), interval - float(transitionMs));
 
-    // Parse zone-to-profile mappings and group by profile name.
-    // Zones sharing the same profile name get synced weather.
-    auto mappings = GetMultiOption("WeatherVibe.ZoneProfile");
+    int const index = WeatherVibeCore::StateIndex(state);
+    if (index >= 0)
+        hold *= _holdMult[size_t(index)];
 
-    LOG_INFO("server.loading", "[WeatherVibe] found {} zone mapping(s)", mappings.size());
+    return uint32(std::clamp(hold, 1000.0f, 24.0f * 3600000.0f));
+}
 
-    std::unordered_map<std::string, std::vector<uint32>> profileZones;
-    for (auto const& raw : mappings)
+void WeatherVibeEngine::MarkDirty(Profile& profile)
+{
+    profile.live.dirty = true;
+    _anyDirty = true;
+}
+
+void WeatherVibeEngine::Begin(Profile& profile, WeatherState state, float pct)
+{
+    LiveState& live = profile.live;
+    DayPart const dp = sWeatherVibeCore.GetCurrentDayPart();
+
+    // The daypart's band is applied here, once: a hold does not shift when the clock crosses
+    // into the next daypart.
+    live.targetState = state;
+    live.targetPct = std::clamp(pct, 0.0f, 100.0f);
+    live.targetRaw = sWeatherVibeCore.PercentToRaw(dp, state, live.targetPct);
+    live.plan = PlanTransition(profile.transition, dp, live.state, live.raw, state, live.targetPct, live.targetRaw);
+    live.holdMs = CalcHoldMs(profile, state, live.plan.durationMs);
+    live.elapsedMs = 0;
+    live.tickTimerMs = 0;
+
+    if (!live.plan.durationMs)
+        Settle(profile);
+    else
+        live.phase = Phase::TRANSITION;
+}
+
+void WeatherVibeEngine::Settle(Profile& profile)
+{
+    LiveState& live = profile.live;
+    WeatherState const previous = live.settledState;
+
+    live.phase = Phase::HOLD;
+    live.state = live.targetState;
+    live.raw = live.targetRaw;
+    live.settledState = live.targetState;
+    MarkDirty(profile);
+
+    Debug(profile, Acore::StringFormat("settled on {} {:.0f}% (raw {:.2f}), {}",
+        WeatherVibeCore::WeatherStateName(live.state), live.targetPct, live.raw,
+        live.forced ? std::string("locked") : "holding " + Duration(live.holdMs)));
+
+    sWeatherVibeWorld.OnSettled(profile, previous);
+}
+
+void WeatherVibeEngine::AdvanceTransition(Profile& profile, uint32 diff)
+{
+    LiveState& live = profile.live;
+
+    live.elapsedMs += diff;
+    if (live.elapsedMs >= live.plan.durationMs)
     {
-        uint32 zoneId = 0;
-        std::string name;
-        if (ParseZoneMapping(raw, zoneId, name))
-            profileZones[name].push_back(zoneId);
-        else
-            LOG_WARN("server.loading", "[WeatherVibe] bad zone mapping '{}'", raw);
-    }
-
-    if (profileZones.empty())
-    {
-        LOG_INFO("server.loading", "[WeatherVibe] no zone profiles configured");
+        Settle(profile);
         return;
     }
 
-    // Load each unique profile once — shared state for all its zones.
-    Season allSeasons[] = { Season::SPRING, Season::SUMMER, Season::AUTUMN, Season::WINTER };
-
-    for (auto const& [profileName, zones] : profileZones)
+    if (live.tickTimerMs > diff)
     {
-        WeatherProfile prof;
-        prof.name = profileName;
-        prof.zoneIds = zones;
-        bool anyEntries = false;
+        live.tickTimerMs -= diff;
+        return;
+    }
+    live.tickTimerMs = _tickMs;
 
-        for (Season s : allSeasons)
+    WeatherState state = live.state;
+    float raw = live.raw;
+    Evaluate(live.plan, float(live.elapsedMs) / float(live.plan.durationMs), state, raw);
+
+    if (state != live.state || std::fabs(raw - live.raw) >= RAW_EPSILON)
+    {
+        live.state = state;
+        live.raw = raw;
+        MarkDirty(profile);
+    }
+}
+
+void WeatherVibeEngine::PickNext(Profile& profile)
+{
+    LiveState& live = profile.live;
+
+    BuildTable(profile, _scratchTable, true);
+
+    int const index = PickEntry(_scratchTable, live.settledState, profile.transition.maxConsecSame,
+        live.consecSame, _rules);
+
+    if (index < 0)
+    {
+        live.holdMs = 60000;   // nothing to pick from right now; look again in a minute
+        return;
+    }
+
+    WeatherEntry const entry = _scratchTable[size_t(index)];
+    WeatherState const from = live.settledState;
+
+    live.consecSame = (entry.state == from) ? live.consecSame + 1 : 1;
+    Begin(profile, entry.state, frand(entry.minPct, entry.maxPct));
+
+    if (live.phase == Phase::TRANSITION)
+        Debug(profile, Acore::StringFormat("{} -> {} {:.0f}% over {}, then holding {}",
+            WeatherVibeCore::WeatherStateName(from), WeatherVibeCore::WeatherStateName(live.targetState),
+            live.targetPct, Duration(live.plan.durationMs), Duration(live.holdMs)));
+}
+
+void WeatherVibeEngine::UpdateProfile(Profile& profile, uint32 diff)
+{
+    LiveState& live = profile.live;
+    if (!live.started)
+        return;
+
+    if (uint32 const resync = sWeatherVibeWorld.GetResyncMs())
+    {
+        if (live.resyncTimerMs <= diff)
         {
-            std::ostringstream baseKey;
-            baseKey << "WeatherVibe.Profile." << profileName << "." << SeasonKey(s);
-
-            for (auto const& line : GetMultiOption(baseKey.str()))
-            {
-                WeatherEntry entry;
-                if (ParseProfileEntry(line, entry))
-                {
-                    prof.seasons[(size_t)s].push_back(entry);
-                    anyEntries = true;
-                }
-                else
-                {
-                    LOG_WARN("server.loading", "[WeatherVibe] bad entry '{}' for {}.{}",
-                        line, profileName, SeasonKey(s));
-                }
-            }
+            live.resyncTimerMs = resync;
+            if (live.phase == Phase::HOLD)
+                sWeatherVibeWorld.FireHook(profile);
         }
+        else
+            live.resyncTimerMs -= diff;
+    }
 
-        if (!anyEntries)
+    if (live.forced && live.forcedTimed)
+    {
+        if (live.forcedMs <= diff)
         {
-            LOG_WARN("server.loading", "[WeatherVibe] profile '{}' has no entries, skipping", profileName);
+            live.forced = false;
+            live.forcedTimed = false;
+            live.forcedMs = 0;
+            live.holdMs = 0;
+            Debug(profile, "override ran out, back to the profile");
+        }
+        else
+            live.forcedMs -= diff;
+    }
+
+    if (live.phase == Phase::TRANSITION)
+    {
+        AdvanceTransition(profile, diff);
+        return;
+    }
+
+    if (live.forced || !_autoEngine)
+        return;
+
+    if (live.holdMs > diff)
+    {
+        live.holdMs -= diff;
+        return;
+    }
+
+    PickNext(profile);
+}
+
+void WeatherVibeEngine::Update(uint32 diff)
+{
+    if (_profiles.empty())
+        return;
+
+    if (_reapplyMs)
+    {
+        if (_reapplyTimerMs <= diff)
+        {
+            _reapplyTimerMs = _reapplyMs;
+            for (Profile& profile : _profiles)
+                if (profile.live.started)
+                    MarkDirty(profile);
+        }
+        else
+            _reapplyTimerMs -= diff;
+    }
+
+    for (Profile& profile : _profiles)
+        UpdateProfile(profile, diff);
+
+    FlushDirty();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Delivery
+// ─────────────────────────────────────────────────────────────
+
+// One pass over the connected clients for everything that changed this tick. Bot sessions are
+// never registered with the session manager, so they are not walked at all, and a player is
+// found wherever they are — continent, battleground or raid.
+void WeatherVibeEngine::FlushDirty()
+{
+    if (!_anyDirty)
+        return;
+
+    for (auto const& [accountId, session] : sWorldSessionMgr->GetAllSessions())
+    {
+        Player* player = session->GetPlayer();
+        if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->IsBeingTeleported())
             continue;
-        }
 
-        prof.transition = LoadTransitionSettings(profileName);
-        prof.state = {};
-        gProfiles.push_back(std::move(prof));
-
-        // Log with zone list.
-        std::ostringstream zl;
-        for (size_t i = 0; i < zones.size(); ++i) { if (i) zl << ", "; zl << zones[i]; }
-        LOG_INFO("server.loading", "[WeatherVibe] profile '{}' -> zone(s) [{}]", profileName, zl.str());
+        Profile const* profile = Resolve(player->GetZoneId(), player->GetAreaId());
+        if (profile && profile->live.dirty)
+            WeatherVibeCore::SendWeather(player, profile->live.state, profile->live.raw);
     }
 
-    LOG_INFO("server.loading", "[WeatherVibe] {} profile(s) active", gProfiles.size());
+    for (Profile& profile : _profiles)
+        profile.live.dirty = false;
 
-    // Stagger reapply timers so profiles don't all re-broadcast on the same tick.
-    // Each profile gets an evenly-spaced offset within the interval window.
-    if (gReapplyIntervalMs > 0 && gProfiles.size() > 0)
+    _anyDirty = false;
+}
+
+// An area's own profile beats its zone's.
+Profile const* WeatherVibeEngine::Resolve(uint32 zoneId, uint32 areaId) const
+{
+    if (!_areaToProfile.empty())
     {
-        uint32 staggerStep = gReapplyIntervalMs / static_cast<uint32>(gProfiles.size());
-        if (staggerStep == 0) staggerStep = 1;
-
-        for (size_t i = 0; i < gProfiles.size(); ++i)
-            gProfiles[i].state.reapplyTimerMs = staggerStep * static_cast<uint32>(i);
-
-        LOG_INFO("server.loading",
-            "[WeatherVibe] reapply every {}s, stagger step {}ms across {} profile(s)",
-            gReapplyIntervalMs / 1000, staggerStep, gProfiles.size());
-    }
-    else
-    {
-        LOG_INFO("server.loading", "[WeatherVibe] reapply disabled");
+        auto it = _areaToProfile.find(areaId);
+        if (it != _areaToProfile.end() && _profiles[it->second].live.started)
+            return &_profiles[it->second];
     }
 
-    // Seed prevSeason so the first tick doesn't false-trigger a blend window.
-    Season initSeason = sWeatherVibeCore.GetCurrentSeason();
-    for (auto& p : gProfiles)
+    auto it = _zoneToProfile.find(zoneId);
+    if (it != _zoneToProfile.end() && _profiles[it->second].live.started)
+        return &_profiles[it->second];
+
+    return nullptr;
+}
+
+void WeatherVibeEngine::SendCurrentTo(Player* player, uint32 zoneId, uint32 areaId) const
+{
+    if (Profile const* profile = Resolve(zoneId, areaId))
     {
-        p.state.prevSeason = initSeason;
-        p.state.blendFromSeason = initSeason;
+        WeatherVibeCore::SendWeather(player, profile->live.state, profile->live.raw);
+        return;
+    }
+
+    // Not a place the module runs. The client keeps showing the last zone's weather until told
+    // otherwise, so clear it — then let the core repeat any weather a script set for this zone
+    // (a boss storm, an event), which that clear would otherwise have wiped.
+    WeatherVibeCore::SendWeather(player, WEATHER_STATE_FINE, 0.0f);
+
+    if (Map* map = player->FindMap())
+        map->SendZoneWeather(zoneId, player);
+}
+
+void WeatherVibeEngine::OnAreaChange(Player* player, uint32 oldArea, uint32 newArea) const
+{
+    if (_areaToProfile.empty())
+        return;
+
+    // On a zone change the area hook fires first; the zone hook that follows does the sending.
+    uint32 const zoneId = player->GetZoneId();
+    if (ZoneOfArea(oldArea) != zoneId)
+        return;
+
+    if (Resolve(zoneId, oldArea) != Resolve(zoneId, newArea))
+        SendCurrentTo(player, zoneId, newArea);
+}
+
+void WeatherVibeEngine::ForEachListener(Profile const& profile, std::function<void(Player*)> const& visit) const
+{
+    for (auto const& [accountId, session] : sWorldSessionMgr->GetAllSessions())
+    {
+        Player* player = session->GetPlayer();
+        if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->IsBeingTeleported())
+            continue;
+
+        if (Resolve(player->GetZoneId(), player->GetAreaId()) == &profile)
+            visit(player);
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Update — called every server tick
-// ─────────────────────────────────────────────────────────────
-
-void WeatherVibeEngine_Update(uint32 diff)
+uint32 WeatherVibeEngine::PushToZone(uint32 zoneId, WeatherState state, float rawGrade) const
 {
-    if (gProfiles.empty()) return;
+    uint32 count = 0;
 
-    Season season = sWeatherVibeCore.GetCurrentSeason();
-    for (WeatherProfile& prof : gProfiles)
-        TickProfile(prof, diff, season);
+    for (auto const& [accountId, session] : sWorldSessionMgr->GetAllSessions())
+    {
+        Player* player = session->GetPlayer();
+        if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->GetZoneId() != zoneId)
+            continue;
+
+        WeatherVibeCore::SendWeather(player, state, rawGrade);
+        ++count;
+    }
+
+    return count;
 }
 
 // ─────────────────────────────────────────────────────────────
-// WorldScript
+// Commands
 // ─────────────────────────────────────────────────────────────
 
-class WeatherVibe_EngineScript : public WorldScript
+Profile* WeatherVibeEngine::FindProfile(std::string const& name)
 {
-public:
-    WeatherVibe_EngineScript() : WorldScript("WeatherVibe_EngineScript") {}
+    std::string const wanted = ToLower(Trim(name));
 
-    void OnStartup() override
+    for (Profile& profile : _profiles)
+        if (ToLower(profile.name) == wanted)
+            return &profile;
+
+    return nullptr;
+}
+
+Profile* WeatherVibeEngine::FindProfileFor(uint32 zoneId, uint32 areaId)
+{
+    return const_cast<Profile*>(Resolve(zoneId, areaId));
+}
+
+void WeatherVibeEngine::Steer(Profile& profile, WeatherState state, float pct)
+{
+    LiveState& live = profile.live;
+    live.started = true;
+    live.forced = false;
+    live.forcedTimed = false;
+    live.forcedMs = 0;
+    live.consecSame = 1;
+
+    Begin(profile, state, pct);
+}
+
+void WeatherVibeEngine::Force(Profile& profile, WeatherState state, float pct, uint32 minutes)
+{
+    LiveState& live = profile.live;
+    live.started = true;
+    live.forced = true;
+    live.forcedTimed = minutes > 0;
+    live.forcedMs = minutes * 60000;
+    live.consecSame = 1;
+
+    Begin(profile, state, pct);
+    live.holdMs = 0;   // once released, the profile picks again straight away
+}
+
+void WeatherVibeEngine::ForceRaw(Profile& profile, WeatherState state, float rawGrade)
+{
+    LiveState& live = profile.live;
+    live.started = true;
+    live.forced = true;
+    live.forcedTimed = false;
+    live.forcedMs = 0;
+
+    live.phase = Phase::HOLD;
+    live.state = live.targetState = live.settledState = state;
+    live.raw = live.targetRaw = WeatherVibeCore::ClampRaw(state, rawGrade);
+    live.targetPct = sWeatherVibeCore.RawToPercent(sWeatherVibeCore.GetCurrentDayPart(), state, live.raw);
+    live.holdMs = 0;
+    live.consecSame = 1;
+    MarkDirty(profile);
+}
+
+void WeatherVibeEngine::Resume(Profile& profile)
+{
+    LiveState& live = profile.live;
+    live.forced = false;
+    live.forcedTimed = false;
+    live.forcedMs = 0;
+
+    if (live.phase == Phase::HOLD)
+        live.holdMs = 0;
+}
+
+void WeatherVibeEngine::SkipHold(Profile& profile)
+{
+    Resume(profile);
+    profile.live.holdMs = 0;   // mid-transition: no hold once it lands
+}
+
+std::string WeatherVibeEngine::Describe(Profile const& profile) const
+{
+    LiveState const& live = profile.live;
+    if (!live.started)
+        return profile.name + ": not running (no usable weather entries)";
+
+    DayPart const dp = sWeatherVibeCore.GetCurrentDayPart();
+
+    std::string out = Acore::StringFormat("{}: {} {:.0f}% (raw {:.2f})", profile.name,
+        WeatherVibeCore::WeatherStateName(live.state),
+        sWeatherVibeCore.RawToPercent(dp, live.state, live.raw), live.raw);
+
+    if (live.phase == Phase::TRANSITION)
+        out += Acore::StringFormat(" -> {} {:.0f}% (raw {:.2f}), {} to go",
+            WeatherVibeCore::WeatherStateName(live.targetState), live.targetPct, live.targetRaw,
+            Duration(live.plan.durationMs - std::min(live.elapsedMs, live.plan.durationMs)));
+    else if (!live.forced && _autoEngine)
+        out += ", next change in " + Duration(live.holdMs);
+
+    if (live.forced)
+        out += live.forcedTimed ? " [locked for " + Duration(live.forcedMs) + "]" : " [locked until .wvibe resume]";
+    else if (!_autoEngine)
+        out += " [profiles are off: manual only]";
+
+    return out;
+}
+
+std::array<float, WV_STATES> WeatherVibeEngine::Simulate(Profile const& profile, uint32 hours) const
+{
+    std::array<double, WV_STATES> spent{};
+    std::array<float, WV_STATES> share{};
+
+    DayPart const dp = sWeatherVibeCore.GetCurrentDayPart();
+    TransitionSettings const& ts = profile.transition;
+
+    // The calendar, the clock and the neighbours stand still for a simulation.
+    WeatherTable table;
+    BuildTable(profile, table, true);
+
+    WeatherState state = profile.live.settledState;
+    float raw = profile.live.targetRaw;
+    uint32 consec = 1;
+
+    double const total = double(hours) * 3600000.0;
+    double elapsed = 0.0;
+
+    while (elapsed < total)
     {
-        if (!sWeatherVibeCore.IsEnabled() || !sWeatherVibeCore.IsProfileEnabled()) return;
-        WeatherVibeEngine_Init();
+        int const index = PickEntry(table, state, ts.maxConsecSame, consec, _rules);
+        if (index < 0)
+            break;
+
+        WeatherEntry const& entry = table[size_t(index)];
+        float const pct = frand(entry.minPct, entry.maxPct);
+        float const toRaw = sWeatherVibeCore.PercentToRaw(dp, entry.state, pct);
+
+        TransitionPlan const plan = PlanTransition(ts, dp, state, raw, entry.state, pct, toRaw);
+        uint32 const hold = CalcHoldMs(profile, entry.state, plan.durationMs);
+
+        int const fromIndex = WeatherVibeCore::StateIndex(state);
+        int const toIndex = WeatherVibeCore::StateIndex(entry.state);
+        if (fromIndex >= 0) spent[size_t(fromIndex)] += plan.durationMs * 0.5;
+        if (toIndex >= 0)   spent[size_t(toIndex)] += plan.durationMs * 0.5 + hold;
+
+        consec = (entry.state == state) ? consec + 1 : 1;
+        state = entry.state;
+        raw = toRaw;
+        elapsed += double(plan.durationMs) + double(hold);
     }
 
-    void OnUpdate(uint32 diff) override
-    {
-        if (!sWeatherVibeCore.IsEnabled() || !sWeatherVibeCore.IsProfileEnabled()) return;
-        WeatherVibeEngine_Update(diff);
-    }
-};
+    if (elapsed > 0.0)
+        for (size_t i = 0; i < WV_STATES; ++i)
+            share[i] = float(spent[i] / elapsed);
 
-void RegisterWeatherVibeEngine()
+    return share;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Debug feed
+// ─────────────────────────────────────────────────────────────
+
+// WeatherVibe.Debug writes the engine's decisions to the server log. A GM who ran
+// `.wvibe debug on` also sees them in chat, for the weather they are standing in. Nobody else does.
+void WeatherVibeEngine::Debug(Profile const& profile, std::string const& line) const
 {
-    new WeatherVibe_EngineScript();
+    if (sWeatherVibeCore.IsDebug())
+        LOG_INFO("module.weathervibe", "[WeatherVibe] {}: {}", profile.name, line);
+
+    auto const& subscribers = sWeatherVibeCore.GetDebugSubscribers();
+    if (subscribers.empty())
+        return;
+
+    std::string const text = "|cff00ff00WeatherVibe:|r " + profile.name + ": " + line;
+
+    for (ObjectGuid guid : subscribers)
+    {
+        Player* gm = ObjectAccessor::FindConnectedPlayer(guid);
+        if (!gm || !gm->IsInWorld())
+            continue;
+
+        if (Resolve(gm->GetZoneId(), gm->GetAreaId()) == &profile)
+            ChatHandler(gm->GetSession()).SendSysMessage(text);
+    }
 }

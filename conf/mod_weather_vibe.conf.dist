@@ -3,10 +3,24 @@
 #  mod_weather_vibe
 #
 # Notes
-# - Use admin commands to drive weather per zone:
-#     .wvibe set <zoneId> <type:0|1|2|3|86> <percentage:0..100>
-#     .wvibe setRaw <zoneId> <type:0|1|2|3|86> <raw:0..1>
-#     .wvibe show  (lists last-applied entries)
+# - worldserver.conf must have ActivateWeather = 0, or the core's own weather fights this module.
+# - Everything here can be re-read without a restart:  .wvibe reload  (or .reload config).
+#   Running weather is kept; only what you changed takes effect.
+# - A trailing "# comment" on a WeatherVibe line is ignored by the module.
+# - AzerothCore only reads a key from mod_weather_vibe.conf if this .conf.dist has the same key.
+#   When you ADD lines (a zone mapping, profile rows, an area, remarks), add them to both files -
+#   or keep no .conf at all and edit the installed .conf.dist. Changing values needs no such care.
+# - Check a changed file before deploying it:  python tools/wv_lint.py conf/mod_weather_vibe.conf.dist
+# - GM commands (.wvibe help lists them):
+#     .wvibe status [here|profile]                      current weather, time to next change
+#     .wvibe where                                      zone/area ids and the profile covering them
+#     .wvibe set <zoneId> <state> <percentage:0..100>   go there, then carry on
+#     .wvibe force <here|profile> <state> <pct> [min]   go there and stay
+#     .wvibe setRaw <zoneId> <state> <raw:0..1>         calibration: snap and stay
+#     .wvibe resume | next | simulate | debug | reload
+#   <state> is a number or a name: 0 Fine, 1 Fog, 3 LightRain, 4 MediumRain, 5 HeavyRain,
+#   6 LightSnow, 7 MediumSnow, 8 HeavySnow, 22 LightSandstorm, 41 MediumSandstorm,
+#   42 HeavySandstorm, 86 Thunders.
 #######################################################################################################
 #######################################################################################################
 
@@ -14,15 +28,18 @@
 # ----------------------------------------------------------------------
 WeatherVibe.Enable = 1
 
-# Enable or disable the announcement that you are using the module
+# Enable or disable the login line that says the server runs this module
 # ----------------------------------------------------------------------
-WeatherVibe.Announce = 1
+WeatherVibe.Announce = 0
 
-# Optional debug (zone-wide broadcast of pushes)
+# Write the engine's decisions (picks, transitions, holds) to the server log.
+# Players never see these. A GM can watch them in chat for the weather they
+# are standing in with:  .wvibe debug on
 # ----------------------------------------------------------------------
-WeatherVibe.Debug = 1
+WeatherVibe.Debug = 0
 
-# Controls who can use .wvibe commands.
+# Who may use the read-only commands (.wvibe status / where / help).
+# Commands that change the weather are always GM-only.
 # ----------------------------------------------------------------------
 #        Default:     0 - GM only (requires SEC_GAMEMASTER or higher)
 #                     1 - Enabled for all players
@@ -31,11 +48,80 @@ WeatherVibeCommand = 0
 
 
 # Toggle weather profiles (automatic weather engine).
-# When disabled, manual commands (.wvibe set / setRaw) still work
-# but profiles will not drive weather automatically.
+# When disabled, every profile sits on a clear sky and only moves when a GM
+# sends it somewhere (.wvibe set / force / setRaw).
 # ----------------------------------------------------------------------
 WeatherVibe.Profile.Enable = 1
-WeatherVibe.Profile.ReApply.PerSec = 30
+
+# Legacy safety net: re-send the current weather to everyone every N seconds.
+# No longer needed - a client is told the weather when it logs in, changes
+# zone or area, and whenever the weather moves. 0 = off.
+# ----------------------------------------------------------------------
+WeatherVibe.Profile.ReApply.PerSec = 0
+
+
+#######################################################################################################
+#######################################################################################################
+# Pace & transitions (engine)
+#######################################################################################################
+
+# Overall pace of the weather. Each profile's Max.Changes.Per.Hour is multiplied
+# by this: 1.0 = as written, 0.5 = half as many changes (weather lasts twice as
+# long), 2.0 = twice as many.
+# ----------------------------------------------------------------------
+WeatherVibe.Pace = 1.0
+
+# How long each kind of weather lingers, as a multiplier on its hold time.
+# Storms pass, fine spells last.
+# ----------------------------------------------------------------------
+WeatherVibe.Hold.Fine            = 1.50
+WeatherVibe.Hold.Fog             = 1.25
+WeatherVibe.Hold.LightRain       = 1.00
+WeatherVibe.Hold.MediumRain      = 1.00
+WeatherVibe.Hold.HeavyRain       = 0.75
+WeatherVibe.Hold.LightSnow       = 1.00
+WeatherVibe.Hold.MediumSnow      = 1.00
+WeatherVibe.Hold.HeavySnow       = 0.75
+WeatherVibe.Hold.LightSandstorm  = 1.00
+WeatherVibe.Hold.MediumSandstorm = 1.00
+WeatherVibe.Hold.HeavySandstorm  = 0.75
+WeatherVibe.Hold.Thunders        = 0.60
+
+# While weather is changing, the intensity is nudged this often (seconds) in
+# small eased steps. How long a whole change takes still comes from each
+# profile's Transition.Step.* and StepSize.Perc.
+# ----------------------------------------------------------------------
+WeatherVibe.Transition.TickSeconds = 4
+
+# Weather builds and eases one step at a time, in both directions:
+#  - calm and light weather mix freely: a clear sky, fog, and the light tier
+#    of any rain, snow or sandstorm
+#  - medium and heavy are reached, and left, one tier at a time
+#  - a thunderstorm grows out of medium or heavy rain (in tables that have it;
+#    where thunder is used on its own it counts as calm weather)
+# The pick is also balanced so that each state turns up as often as its weight
+# says. (Stepping alone starves the upper tiers: under the old rule heavy rain
+# with a weight of 10% showed up well under 1% of the time.)
+# 0 = the old rule: only escalation is stepped, Fine, Fog and Thunders can
+# follow anything, and nothing is balanced.
+# ----------------------------------------------------------------------
+WeatherVibe.Escalation.Strict = 1
+
+# Fog as a bridge: its weight is multiplied by this whenever the sky is clear or
+# the weather is light, so mist tends to come before rain and linger after it.
+# 1.0 = fog is picked exactly as often as its weight says.
+# ----------------------------------------------------------------------
+WeatherVibe.FogBridge.Boost = 1.5
+
+# Weather fronts. When the profiles named in a profile's Neighbors list are in
+# medium/heavy rain, snow or sandstorm (or thunder), that kind of weather
+# becomes likelier here too, so storms drift from zone to zone. Only weather a
+# profile already has is boosted - a desert never inherits snow.
+# Weight multiplier = 1 + Strength x (share of neighbours in that weather).
+# 0 = off.
+# ----------------------------------------------------------------------
+WeatherVibe.Front.Strength = 1.5
+
 
 #######################################################################################################
 #######################################################################################################
@@ -45,6 +131,12 @@ WeatherVibe.Profile.ReApply.PerSec = 30
 # Season: auto|spring|summer|autumn|winter.
 # ----------------------------------------------------------------------
 WeatherVibe.Season = auto
+
+# With Season = auto the year turns gradually: within this many days of an
+# equinox or solstice the neighbouring season's table is mixed in (half and
+# half on the day itself). 0 = seasons switch overnight.
+# ----------------------------------------------------------------------
+WeatherVibe.Season.BlendDays = 30
 
 # Mode: auto|morning|afternoon|evening|night.
 # ----------------------------------------------------------------------
@@ -57,11 +149,85 @@ WeatherVibe.DayPart.AFTERNOON.Start = 12:00
 WeatherVibe.DayPart.EVENING.Start   = 18:00
 WeatherVibe.DayPart.NIGHT.Start     = 22:00
 
+# Time-of-day pattern: a multiplier on a state's weight in every profile during
+# that part of the day. Anything not listed is 1.0. A single profile can
+# differ with WeatherVibe.Profile.<Name>.DayPartWeight.<DAYPART>.<State>.
+# Shipped: mist at dawn and after dark, thunder in the afternoon and evening.
+# ----------------------------------------------------------------------
+WeatherVibe.DayPartWeight.MORNING.Fog        = 1.8
+WeatherVibe.DayPartWeight.MORNING.Thunders   = 0.6
+WeatherVibe.DayPartWeight.AFTERNOON.Fog      = 0.5
+WeatherVibe.DayPartWeight.AFTERNOON.Fine     = 1.1
+WeatherVibe.DayPartWeight.AFTERNOON.Thunders = 1.5
+WeatherVibe.DayPartWeight.EVENING.Fog        = 0.9
+WeatherVibe.DayPartWeight.EVENING.Thunders   = 1.4
+WeatherVibe.DayPartWeight.NIGHT.Fog          = 1.4
+WeatherVibe.DayPartWeight.NIGHT.Thunders     = 0.8
+
 
 #######################################################################################################
 #######################################################################################################
-# Internal intensity ranges - raw grade clamps per daypart/state (core)
-# Defaults: 0.30 - 0.90 for every WeatherState and every daypart.
+# The world reacts
+#######################################################################################################
+
+# When a profile's weather settles, fire the core's weather-change hook for each
+# of its open-world zones. Lua scripts (mod-ale) receive it as
+#   RegisterServerEvent(25, function(event, zoneId, state, grade) ... end)
+# so events elsewhere can follow the weather. ResyncMinutes repeats the current
+# weather to listeners now and then, so a freshly reloaded script catches up
+# (0 = only when it changes).
+# ----------------------------------------------------------------------
+WeatherVibe.Hook.Enable = 1
+WeatherVibe.Hook.ResyncMinutes = 10
+
+# Townsfolk notice. When the weather turns, a friendly humanoid NPC standing
+# near a player may say a line about it. Chance is per player per turn of the
+# weather; a player hears at most one line per cooldown; the player must be
+# outdoors and out of combat, the speaker within Range yards and in sight.
+# ----------------------------------------------------------------------
+WeatherVibe.Remarks.Enable = 1
+WeatherVibe.Remarks.Chance = 15
+WeatherVibe.Remarks.CooldownMinutes = 30
+WeatherVibe.Remarks.Range = 12
+
+# The lines, by what happened. Add, change or remove freely; a kind with no
+# lines is simply never remarked on.
+WeatherVibe.Remarks.Rain.1 = Here comes the rain.
+WeatherVibe.Remarks.Rain.2 = Rain. Knew it by the smell of the air.
+WeatherVibe.Remarks.Rain.3 = Best get under a roof before it settles in.
+WeatherVibe.Remarks.Rain.4 = There go the dry boots.
+
+WeatherVibe.Remarks.Snow.1 = Snow's starting.
+WeatherVibe.Remarks.Snow.2 = First flakes. It'll be white by nightfall.
+WeatherVibe.Remarks.Snow.3 = Cold enough for snow, then.
+
+WeatherVibe.Remarks.Sandstorm.1 = Dust's rising. Cover your face.
+WeatherVibe.Remarks.Sandstorm.2 = Wind's picking up the sand again.
+WeatherVibe.Remarks.Sandstorm.3 = Eyes shut and mouth shut when it blows like this.
+
+WeatherVibe.Remarks.Storm.1 = That's a proper storm coming in.
+WeatherVibe.Remarks.Storm.2 = Listen to that. Sky's in a foul mood.
+WeatherVibe.Remarks.Storm.3 = I'd not be out on the road in this.
+WeatherVibe.Remarks.Storm.4 = Batten down. This one means it.
+
+WeatherVibe.Remarks.Fog.1 = Fog's rolling in.
+WeatherVibe.Remarks.Fog.2 = Can't see the end of the road in this.
+WeatherVibe.Remarks.Fog.3 = Mind your step. Mist hides more than it shows.
+
+WeatherVibe.Remarks.Clear.1 = There, it's clearing up.
+WeatherVibe.Remarks.Clear.2 = Sky's opening. About time.
+WeatherVibe.Remarks.Clear.3 = Looks like the worst of it has passed.
+WeatherVibe.Remarks.Clear.4 = Fine weather again. Make the most of it.
+
+
+#######################################################################################################
+#######################################################################################################
+# Internal intensity ranges - raw grade band per daypart/state (core)
+#
+# A profile entry's percentage (0..100) is how far into this band the weather is.
+# Fine runs the other way round: 100% is a clear sky (the band's minimum) and 0%
+# is as overcast as "fine" gets (the band's maximum) - which is where
+# precipitation takes over, so Fine's maximum should sit near rain's minimum.
 #######################################################################################################
 
 # Fine (0)
@@ -152,13 +318,25 @@ WeatherVibe.Intensity.InternalRange.NIGHT.Thunders           = 0.15, 0.50
 #######################################################################################################
 #######################################################################################################
 # WeatherVibe  -  Complete Zone Weather Profiles
-# Format: weight, weatherType, intensityMinPct, intensityMaxPct
-# Weather Types:
+#
+# WeatherVibe.Profile.<Name>.<Spring|Summer|Autumn|Winter>.<N> = weight, weatherType, intensityMinPct, intensityMaxPct
+# Weather Types (number or name):
 #           0=Fine, 1=Fog,
 #           3=LightRain, 4=MediumRain, 5=HeavyRain,
 #           6=LightSnow, 7=MediumSnow, 8=HeavySnow,
 #           22=LightSandstorm, 41=MediumSandstorm, 42=HeavySandstorm,
 #           86=Thunders
+# For Fine the percentage is how clear the sky is: 100 = cloudless, low = overcast.
+# A profile that leaves a season out borrows a neighbouring one.
+#
+# Per profile, all optional:
+#   .Transition.Step.TimeSeconds.Min/Max   with StepSize.Perc: how long a change takes
+#   .Transition.StepSize.Perc              (one "step" of time per this much intensity travelled)
+#   .Transition.Max.Changes.Per.Hour       how often the weather changes (x WeatherVibe.Pace)
+#   .Transition.Max.Consecutive.Same       same state in a row before a different one is wanted
+#   .Transition.MinHoldSeconds             least time weather stays once it has arrived
+#   .DayPartWeight.<DAYPART>.<State>       this profile's own time-of-day multiplier
+#   .Neighbors = ProfileA, ProfileB        whose storms drift here (listed at the end of this file)
 #######################################################################################################
 #######################################################################################################
 
@@ -206,7 +384,6 @@ WeatherVibe.Profile.DunMorogh.Transition.StepSize.Perc=20
 WeatherVibe.Profile.DunMorogh.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.DunMorogh.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.DunMorogh.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.DunMorogh.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -251,7 +428,6 @@ WeatherVibe.Profile.Badlands.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Badlands.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.Badlands.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Badlands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Badlands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -299,7 +475,6 @@ WeatherVibe.Profile.BlastedLands.Transition.StepSize.Perc=15
 WeatherVibe.Profile.BlastedLands.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.BlastedLands.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.BlastedLands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.BlastedLands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -346,7 +521,6 @@ WeatherVibe.Profile.SwampOfSorrows.Transition.StepSize.Perc=15
 WeatherVibe.Profile.SwampOfSorrows.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.SwampOfSorrows.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.SwampOfSorrows.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.SwampOfSorrows.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -354,7 +528,7 @@ WeatherVibe.Profile.SwampOfSorrows.Transition.SeasonBlendMinutes=10
 # Theme: Eternal twilight, thick fog, haunted atmosphere.
 # Fog is THE dominant weather. Light rain drips through canopy.
 # Never truly "fine"  -  even clear moments feel dark.
-# No snow, no thunderstorms  -  just quiet, creeping dread.
+# No snow. Thunder only as a rare, distant rumble behind steady rain  -  quiet, creeping dread.
 #======================================================================
 
 # Spring: fog dominates, occasional drizzle, rare thin clearings
@@ -391,14 +565,13 @@ WeatherVibe.Profile.Duskwood.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Duskwood.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.Duskwood.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Duskwood.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Duskwood.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
 # Wetlands  -  Marshy, rain-soaked lowlands
 # Theme: Perpetually grey and rainy. Soggy bogs and muddy roads.
 # Rain is the defining feature. Fog rolls in off the coast.
-# Winter brings rare sleet/light snow but map has no snow.
+# Winter brings rare sleet  -  a little light snow, never more.
 #======================================================================
 
 # Spring: rain easing slightly, fog, some clear spells
@@ -439,7 +612,6 @@ WeatherVibe.Profile.Wetlands.Transition.StepSize.Perc=20
 WeatherVibe.Profile.Wetlands.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.Wetlands.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.Wetlands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Wetlands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -452,11 +624,10 @@ WeatherVibe.Profile.Wetlands.Transition.SeasonBlendMinutes=10
 # Spring: very dynamic, sun, showers, fog and thunder
 WeatherVibe.Profile.ElwynnForest.Spring.1=40,0,70,100
 WeatherVibe.Profile.ElwynnForest.Spring.2=20,1,20,50
-WeatherVibe.Profile.ElwynnForest.Spring.3=20,3,20,50
+WeatherVibe.Profile.ElwynnForest.Spring.3=30,3,20,60
 WeatherVibe.Profile.ElwynnForest.Spring.4=10,4,30,60
 WeatherVibe.Profile.ElwynnForest.Spring.5=5,5,30,65
 WeatherVibe.Profile.ElwynnForest.Spring.6=10,86,30,70
-WeatherVibe.Profile.ElwynnForest.Spring.7=10,3,30,60
 
 # Summer: stable warm, clear days, occasional storms
 WeatherVibe.Profile.ElwynnForest.Summer.1=50,0,90,100
@@ -468,11 +639,10 @@ WeatherVibe.Profile.ElwynnForest.Summer.5=10,86,30,70
 # Autumn: wet, foggy, frequent rain
 WeatherVibe.Profile.ElwynnForest.Autumn.1=35,0,70,100
 WeatherVibe.Profile.ElwynnForest.Autumn.2=20,1,30,60
-WeatherVibe.Profile.ElwynnForest.Autumn.3=20,3,30,60
+WeatherVibe.Profile.ElwynnForest.Autumn.3=25,3,30,60
 WeatherVibe.Profile.ElwynnForest.Autumn.4=15,4,30,70
 WeatherVibe.Profile.ElwynnForest.Autumn.5=10,5,30,70
 WeatherVibe.Profile.ElwynnForest.Autumn.6=10,86,30,60
-WeatherVibe.Profile.ElwynnForest.Autumn.7=5,3,30,60
 
 # Winter: colder, foggy, rain common, occasional light snow
 WeatherVibe.Profile.ElwynnForest.Winter.1=30,0,60,100
@@ -487,7 +657,6 @@ WeatherVibe.Profile.ElwynnForest.Transition.StepSize.Perc=20
 WeatherVibe.Profile.ElwynnForest.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.ElwynnForest.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.ElwynnForest.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.ElwynnForest.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -510,7 +679,7 @@ WeatherVibe.Profile.Durotar.Summer.1=60,0,60,100
 WeatherVibe.Profile.Durotar.Summer.2=10,1,20,30
 WeatherVibe.Profile.Durotar.Summer.3=10,22,40,70
 WeatherVibe.Profile.Durotar.Summer.4=5,41,40,70
-WeatherVibe.Profile.Durotar.Summer.5=5,42,40,7
+WeatherVibe.Profile.Durotar.Summer.5=5,42,40,70
 WeatherVibe.Profile.Durotar.Summer.6=5,86,40,70
 
 # Autumn: heat fading, dust calmer, rare light rain
@@ -526,7 +695,7 @@ WeatherVibe.Profile.Durotar.Winter.1=50,0,70,100
 WeatherVibe.Profile.Durotar.Winter.2=15,1,30,50
 WeatherVibe.Profile.Durotar.Winter.3=10,3,20,40
 WeatherVibe.Profile.Durotar.Winter.4=20,22,20,50
-WeatherVibe.Profile.Durotar.Winter.5=15,6,20,50
+WeatherVibe.Profile.Durotar.Winter.5=10,41,20,40
 
 WeatherVibe.Profile.Durotar.Transition.Step.TimeSeconds.Min=20
 WeatherVibe.Profile.Durotar.Transition.Step.TimeSeconds.Max=45
@@ -534,7 +703,6 @@ WeatherVibe.Profile.Durotar.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Durotar.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.Durotar.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Durotar.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Durotar.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -581,7 +749,6 @@ WeatherVibe.Profile.DustwallowMarsh.Transition.StepSize.Perc=10
 WeatherVibe.Profile.DustwallowMarsh.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.DustwallowMarsh.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.DustwallowMarsh.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.DustwallowMarsh.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -625,7 +792,6 @@ WeatherVibe.Profile.Azshara.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Azshara.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.Azshara.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Azshara.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Azshara.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -663,7 +829,7 @@ WeatherVibe.Profile.TheBarrens.Winter.1=45,0,70,90
 WeatherVibe.Profile.TheBarrens.Winter.2=20,1,30,50
 WeatherVibe.Profile.TheBarrens.Winter.3=5,3,20,40
 WeatherVibe.Profile.TheBarrens.Winter.4=15,22,20,40
-WeatherVibe.Profile.TheBarrens.Winter.5=25,6,20,30
+WeatherVibe.Profile.TheBarrens.Winter.5=5,6,20,30
 WeatherVibe.Profile.TheBarrens.Winter.6=5,41,20,40
 
 WeatherVibe.Profile.TheBarrens.Transition.Step.TimeSeconds.Min=25
@@ -672,7 +838,6 @@ WeatherVibe.Profile.TheBarrens.Transition.StepSize.Perc=15
 WeatherVibe.Profile.TheBarrens.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.TheBarrens.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.TheBarrens.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.TheBarrens.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -717,7 +882,6 @@ WeatherVibe.Profile.BlackrockMountain.Transition.StepSize.Perc=10
 WeatherVibe.Profile.BlackrockMountain.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.BlackrockMountain.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.BlackrockMountain.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.BlackrockMountain.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -762,7 +926,6 @@ WeatherVibe.Profile.WesternPlaguelands.Transition.StepSize.Perc=10
 WeatherVibe.Profile.WesternPlaguelands.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.WesternPlaguelands.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.WesternPlaguelands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.WesternPlaguelands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -810,7 +973,6 @@ WeatherVibe.Profile.StranglethornVale.Transition.StepSize.Perc=25
 WeatherVibe.Profile.StranglethornVale.Transition.Max.Changes.Per.Hour=15
 WeatherVibe.Profile.StranglethornVale.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.StranglethornVale.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.StranglethornVale.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -861,7 +1023,6 @@ WeatherVibe.Profile.AlteracMountains.Transition.StepSize.Perc=20
 WeatherVibe.Profile.AlteracMountains.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.AlteracMountains.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.AlteracMountains.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.AlteracMountains.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -910,7 +1071,6 @@ WeatherVibe.Profile.LochModan.Transition.StepSize.Perc=20
 WeatherVibe.Profile.LochModan.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.LochModan.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.LochModan.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.LochModan.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -955,7 +1115,6 @@ WeatherVibe.Profile.Westfall.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Westfall.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.Westfall.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Westfall.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Westfall.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -996,7 +1155,6 @@ WeatherVibe.Profile.DeadwindPass.Transition.StepSize.Perc=10
 WeatherVibe.Profile.DeadwindPass.Transition.Max.Changes.Per.Hour=4
 WeatherVibe.Profile.DeadwindPass.Transition.Max.Consecutive.Same=5
 WeatherVibe.Profile.DeadwindPass.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.DeadwindPass.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1043,7 +1201,6 @@ WeatherVibe.Profile.RedridgeMountains.Transition.StepSize.Perc=20
 WeatherVibe.Profile.RedridgeMountains.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.RedridgeMountains.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.RedridgeMountains.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.RedridgeMountains.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1092,7 +1249,6 @@ WeatherVibe.Profile.ArathiHighlands.Transition.StepSize.Perc=25
 WeatherVibe.Profile.ArathiHighlands.Transition.Max.Changes.Per.Hour=15
 WeatherVibe.Profile.ArathiHighlands.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.ArathiHighlands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.ArathiHighlands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1137,7 +1293,6 @@ WeatherVibe.Profile.BurningSteppes.Transition.StepSize.Perc=10
 WeatherVibe.Profile.BurningSteppes.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.BurningSteppes.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.BurningSteppes.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.BurningSteppes.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1186,7 +1341,6 @@ WeatherVibe.Profile.TheHinterlands.Transition.StepSize.Perc=20
 WeatherVibe.Profile.TheHinterlands.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.TheHinterlands.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.TheHinterlands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.TheHinterlands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1231,7 +1385,6 @@ WeatherVibe.Profile.SearingGorge.Transition.StepSize.Perc=10
 WeatherVibe.Profile.SearingGorge.Transition.Max.Changes.Per.Hour=5
 WeatherVibe.Profile.SearingGorge.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.SearingGorge.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.SearingGorge.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1278,7 +1431,6 @@ WeatherVibe.Profile.Dragonblight.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Dragonblight.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.Dragonblight.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Dragonblight.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Dragonblight.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1329,7 +1481,6 @@ WeatherVibe.Profile.ZulDrak.Transition.StepSize.Perc=20
 WeatherVibe.Profile.ZulDrak.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.ZulDrak.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.ZulDrak.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.ZulDrak.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1377,7 +1528,6 @@ WeatherVibe.Profile.StormPeaks.Transition.StepSize.Perc=25
 WeatherVibe.Profile.StormPeaks.Transition.Max.Changes.Per.Hour=18
 WeatherVibe.Profile.StormPeaks.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.StormPeaks.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.StormPeaks.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1422,7 +1572,6 @@ WeatherVibe.Profile.TirisfalGlades.Transition.StepSize.Perc=10
 WeatherVibe.Profile.TirisfalGlades.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.TirisfalGlades.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.TirisfalGlades.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.TirisfalGlades.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1471,7 +1620,6 @@ WeatherVibe.Profile.SilverpineForest.Transition.StepSize.Perc=15
 WeatherVibe.Profile.SilverpineForest.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.SilverpineForest.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.SilverpineForest.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.SilverpineForest.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1516,7 +1664,6 @@ WeatherVibe.Profile.EasternPlaguelands.Transition.StepSize.Perc=10
 WeatherVibe.Profile.EasternPlaguelands.Transition.Max.Changes.Per.Hour=5
 WeatherVibe.Profile.EasternPlaguelands.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.EasternPlaguelands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.EasternPlaguelands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1556,7 +1703,6 @@ WeatherVibe.Profile.Teldrassil.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Teldrassil.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.Teldrassil.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Teldrassil.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Teldrassil.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1604,7 +1750,6 @@ WeatherVibe.Profile.Darkshore.Transition.StepSize.Perc=20
 WeatherVibe.Profile.Darkshore.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.Darkshore.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.Darkshore.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Darkshore.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1652,7 +1797,6 @@ WeatherVibe.Profile.TheGreatSea.Transition.StepSize.Perc=30
 WeatherVibe.Profile.TheGreatSea.Transition.Max.Changes.Per.Hour=18
 WeatherVibe.Profile.TheGreatSea.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.TheGreatSea.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.TheGreatSea.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1701,14 +1845,14 @@ WeatherVibe.Profile.Icecrown.Transition.StepSize.Perc=20
 WeatherVibe.Profile.Icecrown.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.Icecrown.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Icecrown.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Icecrown.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
 # Mulgore  -  Beautiful green rolling plains
 # Theme: Idyllic, peaceful, Native-American prairie. Tauren homeland.
 # Fine is THE dominant weather  -  user notes it's prettiest at 100%.
-# Very occasional gentle rain. Rare morning fog. No snow, no storms.
+# Very occasional gentle rain. Rare morning fog. No snow.
+# A storm is never more than a far-off rumble on a warm day.
 # Should feel serene and open above all else.
 #======================================================================
 
@@ -1732,9 +1876,8 @@ WeatherVibe.Profile.Mulgore.Autumn.4=5,4,20,40
 
 # Winter: cool but still mostly fine, morning fog, rare light rain
 WeatherVibe.Profile.Mulgore.Winter.1=55,0,40,80
-WeatherVibe.Profile.Mulgore.Winter.2=15,1,30,50
-WeatherVibe.Profile.Mulgore.Winter.3=5,3,20,40
-WeatherVibe.Profile.Mulgore.Winter.4=20,6,20,40
+WeatherVibe.Profile.Mulgore.Winter.2=20,1,30,50
+WeatherVibe.Profile.Mulgore.Winter.3=10,3,20,40
 
 WeatherVibe.Profile.Mulgore.Transition.Step.TimeSeconds.Min=30
 WeatherVibe.Profile.Mulgore.Transition.Step.TimeSeconds.Max=60
@@ -1742,7 +1885,6 @@ WeatherVibe.Profile.Mulgore.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Mulgore.Transition.Max.Changes.Per.Hour=4
 WeatherVibe.Profile.Mulgore.Transition.Max.Consecutive.Same=5
 WeatherVibe.Profile.Mulgore.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Mulgore.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1791,7 +1933,6 @@ WeatherVibe.Profile.HillsbradFoothills.Transition.StepSize.Perc=20
 WeatherVibe.Profile.HillsbradFoothills.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.HillsbradFoothills.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.HillsbradFoothills.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.HillsbradFoothills.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1836,7 +1977,6 @@ WeatherVibe.Profile.Ashenvale.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Ashenvale.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.Ashenvale.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Ashenvale.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Ashenvale.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1884,7 +2024,6 @@ WeatherVibe.Profile.Feralas.Transition.StepSize.Perc=20
 WeatherVibe.Profile.Feralas.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.Feralas.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.Feralas.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Feralas.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1929,7 +2068,6 @@ WeatherVibe.Profile.Felwood.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Felwood.Transition.Max.Changes.Per.Hour=5
 WeatherVibe.Profile.Felwood.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Felwood.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Felwood.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -1981,13 +2119,12 @@ WeatherVibe.Profile.GrizzlyHills.Transition.StepSize.Perc=20
 WeatherVibe.Profile.GrizzlyHills.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.GrizzlyHills.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.GrizzlyHills.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.GrizzlyHills.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
 # ThousandNeedles  -  Desert canyon, towering mesas
 # Theme: Red rock pillars, deep canyons, bone dry.
-# Fine dominant. Sandstorms (canyon winds). Almost no rain.
+# Fine dominant. Sandstorms (canyon winds). Rain is a rare drizzle.
 # No snow. Sheltered canyons mean less wind than open desert.
 #======================================================================
 
@@ -2024,7 +2161,6 @@ WeatherVibe.Profile.ThousandNeedles.Transition.StepSize.Perc=10
 WeatherVibe.Profile.ThousandNeedles.Transition.Max.Changes.Per.Hour=5
 WeatherVibe.Profile.ThousandNeedles.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.ThousandNeedles.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.ThousandNeedles.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2068,7 +2204,6 @@ WeatherVibe.Profile.Desolace.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Desolace.Transition.Max.Changes.Per.Hour=5
 WeatherVibe.Profile.Desolace.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Desolace.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Desolace.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2113,7 +2248,6 @@ WeatherVibe.Profile.StonetalonMountains.Transition.StepSize.Perc=15
 WeatherVibe.Profile.StonetalonMountains.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.StonetalonMountains.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.StonetalonMountains.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.StonetalonMountains.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2160,7 +2294,6 @@ WeatherVibe.Profile.Tanaris.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Tanaris.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.Tanaris.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Tanaris.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Tanaris.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2208,7 +2341,6 @@ WeatherVibe.Profile.UnGoroCrater.Transition.StepSize.Perc=20
 WeatherVibe.Profile.UnGoroCrater.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.UnGoroCrater.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.UnGoroCrater.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.UnGoroCrater.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2249,7 +2381,6 @@ WeatherVibe.Profile.Moonglade.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Moonglade.Transition.Max.Changes.Per.Hour=4
 WeatherVibe.Profile.Moonglade.Transition.Max.Consecutive.Same=5
 WeatherVibe.Profile.Moonglade.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Moonglade.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2302,7 +2433,6 @@ WeatherVibe.Profile.HowlingFjord.Transition.StepSize.Perc=25
 WeatherVibe.Profile.HowlingFjord.Transition.Max.Changes.Per.Hour=15
 WeatherVibe.Profile.HowlingFjord.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.HowlingFjord.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.HowlingFjord.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2350,7 +2480,6 @@ WeatherVibe.Profile.Winterspring.Transition.StepSize.Perc=20
 WeatherVibe.Profile.Winterspring.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.Winterspring.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Winterspring.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Winterspring.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2394,7 +2523,6 @@ WeatherVibe.Profile.Silithus.Transition.StepSize.Perc=15
 WeatherVibe.Profile.Silithus.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.Silithus.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.Silithus.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Silithus.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2434,7 +2562,6 @@ WeatherVibe.Profile.EmeraldForest.Transition.StepSize.Perc=10
 WeatherVibe.Profile.EmeraldForest.Transition.Max.Changes.Per.Hour=4
 WeatherVibe.Profile.EmeraldForest.Transition.Max.Consecutive.Same=5
 WeatherVibe.Profile.EmeraldForest.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.EmeraldForest.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2476,7 +2603,6 @@ WeatherVibe.Profile.AhnQiraj.Transition.StepSize.Perc=15
 WeatherVibe.Profile.AhnQiraj.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.AhnQiraj.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.AhnQiraj.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.AhnQiraj.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2517,7 +2643,6 @@ WeatherVibe.Profile.EversongWoods.Transition.StepSize.Perc=10
 WeatherVibe.Profile.EversongWoods.Transition.Max.Changes.Per.Hour=4
 WeatherVibe.Profile.EversongWoods.Transition.Max.Consecutive.Same=5
 WeatherVibe.Profile.EversongWoods.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.EversongWoods.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2561,7 +2686,6 @@ WeatherVibe.Profile.Ghostlands.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Ghostlands.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.Ghostlands.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Ghostlands.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Ghostlands.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2610,7 +2734,6 @@ WeatherVibe.Profile.HellfirePeninsula.Transition.StepSize.Perc=15
 WeatherVibe.Profile.HellfirePeninsula.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.HellfirePeninsula.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.HellfirePeninsula.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.HellfirePeninsula.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2655,14 +2778,14 @@ WeatherVibe.Profile.ShadowmoonValley.Transition.StepSize.Perc=15
 WeatherVibe.Profile.ShadowmoonValley.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.ShadowmoonValley.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.ShadowmoonValley.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.ShadowmoonValley.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
 # Zangarmarsh  -  Alien mushroom swamp (Outland)
 # Theme: Glowing mushrooms, bioluminescent water, alien marsh.
 # Fog = spore clouds. Rain = dripping moisture. Fine = eerie glow.
-# No snow, no sand. Damp alien atmosphere.
+# The light "snow" rows are drifting spores, not cold  -  never more than light.
+# No sand. Damp alien atmosphere.
 #======================================================================
 
 # Spring: spore clouds, dripping, foggy
@@ -2702,7 +2825,6 @@ WeatherVibe.Profile.Zangarmarsh.Transition.StepSize.Perc=10
 WeatherVibe.Profile.Zangarmarsh.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.Zangarmarsh.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.Zangarmarsh.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Zangarmarsh.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2747,7 +2869,6 @@ WeatherVibe.Profile.BladesEdgeMountains.Transition.StepSize.Perc=15
 WeatherVibe.Profile.BladesEdgeMountains.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.BladesEdgeMountains.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.BladesEdgeMountains.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.BladesEdgeMountains.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2793,7 +2914,6 @@ WeatherVibe.Profile.Netherstorm.Transition.StepSize.Perc=25
 WeatherVibe.Profile.Netherstorm.Transition.Max.Changes.Per.Hour=18
 WeatherVibe.Profile.Netherstorm.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.Netherstorm.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Netherstorm.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2833,7 +2953,6 @@ WeatherVibe.Profile.AzuremystIsle.Transition.StepSize.Perc=10
 WeatherVibe.Profile.AzuremystIsle.Transition.Max.Changes.Per.Hour=6
 WeatherVibe.Profile.AzuremystIsle.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.AzuremystIsle.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.AzuremystIsle.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2877,7 +2996,6 @@ WeatherVibe.Profile.BloodmystIsle.Transition.StepSize.Perc=15
 WeatherVibe.Profile.BloodmystIsle.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.BloodmystIsle.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.BloodmystIsle.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.BloodmystIsle.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2925,7 +3043,6 @@ WeatherVibe.Profile.MountHyjal.Transition.StepSize.Perc=20
 WeatherVibe.Profile.MountHyjal.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.MountHyjal.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.MountHyjal.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.MountHyjal.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -2973,7 +3090,6 @@ WeatherVibe.Profile.SholazarBasin.Transition.StepSize.Perc=25
 WeatherVibe.Profile.SholazarBasin.Transition.Max.Changes.Per.Hour=15
 WeatherVibe.Profile.SholazarBasin.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.SholazarBasin.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.SholazarBasin.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -3017,7 +3133,6 @@ WeatherVibe.Profile.EyeOfTheStorm.Transition.StepSize.Perc=20
 WeatherVibe.Profile.EyeOfTheStorm.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.EyeOfTheStorm.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.EyeOfTheStorm.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.EyeOfTheStorm.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -3065,7 +3180,6 @@ WeatherVibe.Profile.FrozenSea.Transition.StepSize.Perc=20
 WeatherVibe.Profile.FrozenSea.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.FrozenSea.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.FrozenSea.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.FrozenSea.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -3109,7 +3223,6 @@ WeatherVibe.Profile.IsleOfQuelDanas.Transition.StepSize.Perc=20
 WeatherVibe.Profile.IsleOfQuelDanas.Transition.Max.Changes.Per.Hour=10
 WeatherVibe.Profile.IsleOfQuelDanas.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.IsleOfQuelDanas.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.IsleOfQuelDanas.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -3157,7 +3270,6 @@ WeatherVibe.Profile.Wintergrasp.Transition.StepSize.Perc=20
 WeatherVibe.Profile.Wintergrasp.Transition.Max.Changes.Per.Hour=12
 WeatherVibe.Profile.Wintergrasp.Transition.Max.Consecutive.Same=2
 WeatherVibe.Profile.Wintergrasp.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.Wintergrasp.Transition.SeasonBlendMinutes=10
 
 
 #======================================================================
@@ -3202,15 +3314,281 @@ WeatherVibe.Profile.ScarletEnclave.Transition.StepSize.Perc=15
 WeatherVibe.Profile.ScarletEnclave.Transition.Max.Changes.Per.Hour=8
 WeatherVibe.Profile.ScarletEnclave.Transition.Max.Consecutive.Same=3
 WeatherVibe.Profile.ScarletEnclave.Transition.MinHoldSeconds=60
-WeatherVibe.Profile.ScarletEnclave.Transition.SeasonBlendMinutes=10
+
+
+#======================================================================
+# BoreanTundra  -  Windswept coastal tundra (Northrend)
+# Theme: Cold, wide and exposed. Sea wind, geyser steam, low grey skies.
+# Snow most of the year but lighter than the interior; the brief summer
+# thaw brings rain. Fog off the water and the steam fields. No sand.
+#======================================================================
+
+# Spring: thaw beginning, snow still common, sea fog
+WeatherVibe.Profile.BoreanTundra.Spring.1=20,0,30,60
+WeatherVibe.Profile.BoreanTundra.Spring.2=20,1,30,60
+WeatherVibe.Profile.BoreanTundra.Spring.3=10,3,20,40
+WeatherVibe.Profile.BoreanTundra.Spring.4=30,6,30,60
+WeatherVibe.Profile.BoreanTundra.Spring.5=15,7,30,60
+WeatherVibe.Profile.BoreanTundra.Spring.6=5,8,30,60
+
+# Summer: the thaw, most clear days, rain instead of snow
+WeatherVibe.Profile.BoreanTundra.Summer.1=30,0,40,70
+WeatherVibe.Profile.BoreanTundra.Summer.2=20,1,30,60
+WeatherVibe.Profile.BoreanTundra.Summer.3=20,3,20,50
+WeatherVibe.Profile.BoreanTundra.Summer.4=5,4,20,50
+WeatherVibe.Profile.BoreanTundra.Summer.5=20,6,20,50
+WeatherVibe.Profile.BoreanTundra.Summer.6=5,7,20,40
+
+# Autumn: freezing over, fog thick, snow building
+WeatherVibe.Profile.BoreanTundra.Autumn.1=15,0,30,50
+WeatherVibe.Profile.BoreanTundra.Autumn.2=25,1,40,70
+WeatherVibe.Profile.BoreanTundra.Autumn.3=30,6,30,60
+WeatherVibe.Profile.BoreanTundra.Autumn.4=20,7,30,70
+WeatherVibe.Profile.BoreanTundra.Autumn.5=10,8,30,70
+
+# Winter: long dark, steady snow, blizzards off the sea
+WeatherVibe.Profile.BoreanTundra.Winter.1=10,0,20,40
+WeatherVibe.Profile.BoreanTundra.Winter.2=15,1,40,70
+WeatherVibe.Profile.BoreanTundra.Winter.3=25,6,30,60
+WeatherVibe.Profile.BoreanTundra.Winter.4=30,7,40,70
+WeatherVibe.Profile.BoreanTundra.Winter.5=20,8,40,80
+
+WeatherVibe.Profile.BoreanTundra.Transition.Step.TimeSeconds.Min=15
+WeatherVibe.Profile.BoreanTundra.Transition.Step.TimeSeconds.Max=35
+WeatherVibe.Profile.BoreanTundra.Transition.StepSize.Perc=20
+WeatherVibe.Profile.BoreanTundra.Transition.Max.Changes.Per.Hour=10
+WeatherVibe.Profile.BoreanTundra.Transition.Max.Consecutive.Same=3
+WeatherVibe.Profile.BoreanTundra.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# CrystalsongForest  -  Enchanted crystal forest beneath Dalaran
+# Theme: Still, silent, spellbound. The air glitters.
+# Mostly calm and clear; light snow drifts like falling motes; a pale
+# haze now and then. No rain, no wind, no storms. Dalaran floats above
+# it and shares its sky.
+#======================================================================
+
+# Spring: calm, glittering, drifting motes
+WeatherVibe.Profile.CrystalsongForest.Spring.1=45,0,60,90
+WeatherVibe.Profile.CrystalsongForest.Spring.2=20,1,20,50
+WeatherVibe.Profile.CrystalsongForest.Spring.3=30,6,20,50
+WeatherVibe.Profile.CrystalsongForest.Spring.4=5,7,20,40
+
+# Summer: clearest
+WeatherVibe.Profile.CrystalsongForest.Summer.1=55,0,70,100
+WeatherVibe.Profile.CrystalsongForest.Summer.2=15,1,20,40
+WeatherVibe.Profile.CrystalsongForest.Summer.3=25,6,20,40
+WeatherVibe.Profile.CrystalsongForest.Summer.4=5,7,20,40
+
+# Autumn: haze thickens a little
+WeatherVibe.Profile.CrystalsongForest.Autumn.1=40,0,60,90
+WeatherVibe.Profile.CrystalsongForest.Autumn.2=25,1,30,50
+WeatherVibe.Profile.CrystalsongForest.Autumn.3=30,6,20,50
+WeatherVibe.Profile.CrystalsongForest.Autumn.4=5,7,20,40
+
+# Winter: more snow, still gentle
+WeatherVibe.Profile.CrystalsongForest.Winter.1=35,0,50,80
+WeatherVibe.Profile.CrystalsongForest.Winter.2=20,1,30,50
+WeatherVibe.Profile.CrystalsongForest.Winter.3=35,6,30,60
+WeatherVibe.Profile.CrystalsongForest.Winter.4=10,7,20,50
+
+WeatherVibe.Profile.CrystalsongForest.Transition.Step.TimeSeconds.Min=30
+WeatherVibe.Profile.CrystalsongForest.Transition.Step.TimeSeconds.Max=60
+WeatherVibe.Profile.CrystalsongForest.Transition.StepSize.Perc=10
+WeatherVibe.Profile.CrystalsongForest.Transition.Max.Changes.Per.Hour=4
+WeatherVibe.Profile.CrystalsongForest.Transition.Max.Consecutive.Same=5
+WeatherVibe.Profile.CrystalsongForest.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# Nagrand  -  Lush floating grasslands (Outland)
+# Theme: The last unspoiled corner of Draenor. Open, green, serene.
+# Fine dominates. Gentle rain keeps it green; a thunderhead now and
+# then rolls between the floating isles. No snow, no sand.
+#======================================================================
+
+# Spring: fresh, showery, mostly fine
+WeatherVibe.Profile.Nagrand.Spring.1=55,0,80,100
+WeatherVibe.Profile.Nagrand.Spring.2=10,1,20,40
+WeatherVibe.Profile.Nagrand.Spring.3=20,3,20,50
+WeatherVibe.Profile.Nagrand.Spring.4=10,4,20,50
+WeatherVibe.Profile.Nagrand.Spring.5=5,86,20,40
+
+# Summer: peak beauty, rare shower
+WeatherVibe.Profile.Nagrand.Summer.1=65,0,90,100
+WeatherVibe.Profile.Nagrand.Summer.2=5,1,20,30
+WeatherVibe.Profile.Nagrand.Summer.3=15,3,20,40
+WeatherVibe.Profile.Nagrand.Summer.4=10,4,20,50
+WeatherVibe.Profile.Nagrand.Summer.5=5,86,20,40
+
+# Autumn: more rain, morning mist over the plains
+WeatherVibe.Profile.Nagrand.Autumn.1=50,0,80,100
+WeatherVibe.Profile.Nagrand.Autumn.2=15,1,20,50
+WeatherVibe.Profile.Nagrand.Autumn.3=20,3,20,50
+WeatherVibe.Profile.Nagrand.Autumn.4=10,4,30,50
+WeatherVibe.Profile.Nagrand.Autumn.5=5,86,20,40
+
+# Winter: cooler, misty, still mostly fine
+WeatherVibe.Profile.Nagrand.Winter.1=50,0,70,100
+WeatherVibe.Profile.Nagrand.Winter.2=20,1,30,50
+WeatherVibe.Profile.Nagrand.Winter.3=20,3,20,40
+WeatherVibe.Profile.Nagrand.Winter.4=10,4,20,40
+
+WeatherVibe.Profile.Nagrand.Transition.Step.TimeSeconds.Min=30
+WeatherVibe.Profile.Nagrand.Transition.Step.TimeSeconds.Max=60
+WeatherVibe.Profile.Nagrand.Transition.StepSize.Perc=10
+WeatherVibe.Profile.Nagrand.Transition.Max.Changes.Per.Hour=4
+WeatherVibe.Profile.Nagrand.Transition.Max.Consecutive.Same=5
+WeatherVibe.Profile.Nagrand.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# TerokkarForest  -  Dense Outland forest and the Bone Wastes
+# Theme: Tall olemba canopy, dim green light, damp and misty.
+# Light rain and fog under the trees; dust blowing in off the Bone
+# Wastes. No snow. Shattrath sits inside it and shares its sky.
+#======================================================================
+
+# Spring: damp, misty, light rain
+WeatherVibe.Profile.TerokkarForest.Spring.1=30,0,40,70
+WeatherVibe.Profile.TerokkarForest.Spring.2=25,1,30,60
+WeatherVibe.Profile.TerokkarForest.Spring.3=25,3,20,50
+WeatherVibe.Profile.TerokkarForest.Spring.4=10,4,30,50
+WeatherVibe.Profile.TerokkarForest.Spring.5=5,22,20,40
+WeatherVibe.Profile.TerokkarForest.Spring.6=5,86,20,40
+
+# Summer: driest, clearer, more dust off the Wastes
+WeatherVibe.Profile.TerokkarForest.Summer.1=40,0,50,80
+WeatherVibe.Profile.TerokkarForest.Summer.2=15,1,20,50
+WeatherVibe.Profile.TerokkarForest.Summer.3=20,3,20,50
+WeatherVibe.Profile.TerokkarForest.Summer.4=10,4,30,50
+WeatherVibe.Profile.TerokkarForest.Summer.5=10,22,20,40
+WeatherVibe.Profile.TerokkarForest.Summer.6=5,86,20,40
+
+# Autumn: wettest, fog thick under the canopy
+WeatherVibe.Profile.TerokkarForest.Autumn.1=25,0,30,60
+WeatherVibe.Profile.TerokkarForest.Autumn.2=30,1,40,70
+WeatherVibe.Profile.TerokkarForest.Autumn.3=25,3,30,60
+WeatherVibe.Profile.TerokkarForest.Autumn.4=15,4,30,60
+WeatherVibe.Profile.TerokkarForest.Autumn.5=5,22,20,40
+
+# Winter: cold mist, steady drizzle, dust on the wind
+WeatherVibe.Profile.TerokkarForest.Winter.1=25,0,30,60
+WeatherVibe.Profile.TerokkarForest.Winter.2=30,1,40,70
+WeatherVibe.Profile.TerokkarForest.Winter.3=25,3,30,60
+WeatherVibe.Profile.TerokkarForest.Winter.4=10,4,30,50
+WeatherVibe.Profile.TerokkarForest.Winter.5=10,22,20,40
+
+WeatherVibe.Profile.TerokkarForest.Transition.Step.TimeSeconds.Min=20
+WeatherVibe.Profile.TerokkarForest.Transition.Step.TimeSeconds.Max=45
+WeatherVibe.Profile.TerokkarForest.Transition.StepSize.Perc=15
+WeatherVibe.Profile.TerokkarForest.Transition.Max.Changes.Per.Hour=8
+WeatherVibe.Profile.TerokkarForest.Transition.Max.Consecutive.Same=3
+WeatherVibe.Profile.TerokkarForest.Transition.MinHoldSeconds=60
+
+
+#######################################################################################################
+#######################################################################################################
+# Microclimates  -  profiles for single areas inside a zone
+#
+# Mapped with WeatherVibe.AreaProfile (below), these override the zone's weather
+# for anyone standing in that area. They are the same kind of profile as the
+# ones above; these four keep one table all year (only Spring is given, the
+# other seasons borrow it).
+#######################################################################################################
+#######################################################################################################
+
+
+#======================================================================
+# PlagueCauldron  -  The blighted farms of the Western Plaguelands
+# Theme: A Scourge cauldron stands in each field and the air never clears.
+# Thick, sickly haze almost always; a thin drizzle; a rumble in the murk.
+# The rest of the zone is gloomy  -  here you can barely see the barn.
+#======================================================================
+
+WeatherVibe.Profile.PlagueCauldron.Spring.1=10,0,10,20
+WeatherVibe.Profile.PlagueCauldron.Spring.2=60,1,60,95
+WeatherVibe.Profile.PlagueCauldron.Spring.3=20,3,30,50
+WeatherVibe.Profile.PlagueCauldron.Spring.4=10,86,20,40
+
+WeatherVibe.Profile.PlagueCauldron.Transition.Step.TimeSeconds.Min=25
+WeatherVibe.Profile.PlagueCauldron.Transition.Step.TimeSeconds.Max=50
+WeatherVibe.Profile.PlagueCauldron.Transition.StepSize.Perc=10
+WeatherVibe.Profile.PlagueCauldron.Transition.Max.Changes.Per.Hour=4
+WeatherVibe.Profile.PlagueCauldron.Transition.Max.Consecutive.Same=5
+WeatherVibe.Profile.PlagueCauldron.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# ScourgeShadow  -  Under a necropolis (Naxxanar, Borean Tundra)
+# Theme: The citadel blots out the sky. Dark, cold, wrong.
+# Fog and snow in the gloom, thunder from above. Almost never clear.
+#======================================================================
+
+WeatherVibe.Profile.ScourgeShadow.Spring.1=10,0,10,20
+WeatherVibe.Profile.ScourgeShadow.Spring.2=30,1,50,80
+WeatherVibe.Profile.ScourgeShadow.Spring.3=25,6,30,60
+WeatherVibe.Profile.ScourgeShadow.Spring.4=20,7,30,60
+WeatherVibe.Profile.ScourgeShadow.Spring.5=15,86,30,60
+
+WeatherVibe.Profile.ScourgeShadow.Transition.Step.TimeSeconds.Min=20
+WeatherVibe.Profile.ScourgeShadow.Transition.Step.TimeSeconds.Max=45
+WeatherVibe.Profile.ScourgeShadow.Transition.StepSize.Perc=15
+WeatherVibe.Profile.ScourgeShadow.Transition.Max.Changes.Per.Hour=6
+WeatherVibe.Profile.ScourgeShadow.Transition.Max.Consecutive.Same=4
+WeatherVibe.Profile.ScourgeShadow.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# AncientWinter  -  The Valley of Ancient Winters (Storm Peaks)
+# Theme: The name says it. The blizzard here has never stopped.
+# Snow always, usually heavy. No clear days at all.
+#======================================================================
+
+WeatherVibe.Profile.AncientWinter.Spring.1=5,1,50,80
+WeatherVibe.Profile.AncientWinter.Spring.2=15,6,50,80
+WeatherVibe.Profile.AncientWinter.Spring.3=35,7,50,80
+WeatherVibe.Profile.AncientWinter.Spring.4=45,8,50,90
+
+WeatherVibe.Profile.AncientWinter.Transition.Step.TimeSeconds.Min=15
+WeatherVibe.Profile.AncientWinter.Transition.Step.TimeSeconds.Max=35
+WeatherVibe.Profile.AncientWinter.Transition.StepSize.Perc=20
+WeatherVibe.Profile.AncientWinter.Transition.Max.Changes.Per.Hour=8
+WeatherVibe.Profile.AncientWinter.Transition.Max.Consecutive.Same=4
+WeatherVibe.Profile.AncientWinter.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# ArgentTournament  -  The tournament grounds (Icecrown)
+# Theme: Pennants, crowds and open lists at the edge of the glacier.
+# Icecrown's cold without its fury: flurries and bright cold days,
+# so the jousting is not fought in a permanent blizzard.
+#======================================================================
+
+WeatherVibe.Profile.ArgentTournament.Spring.1=40,0,40,70
+WeatherVibe.Profile.ArgentTournament.Spring.2=15,1,30,50
+WeatherVibe.Profile.ArgentTournament.Spring.3=35,6,20,50
+WeatherVibe.Profile.ArgentTournament.Spring.4=10,7,20,40
+
+WeatherVibe.Profile.ArgentTournament.Transition.Step.TimeSeconds.Min=20
+WeatherVibe.Profile.ArgentTournament.Transition.Step.TimeSeconds.Max=45
+WeatherVibe.Profile.ArgentTournament.Transition.StepSize.Perc=15
+WeatherVibe.Profile.ArgentTournament.Transition.Max.Changes.Per.Hour=6
+WeatherVibe.Profile.ArgentTournament.Transition.Max.Consecutive.Same=4
+WeatherVibe.Profile.ArgentTournament.Transition.MinHoldSeconds=60
 
 
 #######################################################################################################
 #######################################################################################################
 # Zone-to-Profile Mappings
-# Format: zoneId,ProfileName
-# Zones sharing the same profile name are automatically synced.
-# Cities sync with their surrounding outdoor zone.
+# Format: WeatherVibe.ZoneProfile.<N> = zoneId,ProfileName
+# Zones sharing the same profile name are automatically synced: one weather,
+# one set of timers, everyone in any of them sees the same sky.
+# Cities sync with their surrounding outdoor zone. Battlegrounds and raids work
+# like any other zone. Ids are checked against AreaTable at startup; anything
+# unknown, or that is really a sub-area, is reported in the server log.
+# .wvibe where shows the ids of where you stand.
 #######################################################################################################
 #######################################################################################################
 
@@ -3246,7 +3624,7 @@ WeatherVibe.ZoneProfile.26=1637,Durotar
 WeatherVibe.ZoneProfile.27=15,DustwallowMarsh
 WeatherVibe.ZoneProfile.28=16,Azshara
 WeatherVibe.ZoneProfile.29=17,TheBarrens
-WeatherVibe.ZoneProfile.30=1638,TheBarrens
+WeatherVibe.ZoneProfile.30=1638,Mulgore
 WeatherVibe.ZoneProfile.31=141,Teldrassil
 WeatherVibe.ZoneProfile.32=1657,Teldrassil
 WeatherVibe.ZoneProfile.33=148,Darkshore
@@ -3316,3 +3694,169 @@ WeatherVibe.ZoneProfile.76=4080,IsleOfQuelDanas
 
 # --- Scarlet Enclave (DK Starting Zone) ---
 WeatherVibe.ZoneProfile.77=4298,ScarletEnclave
+
+# --- Cities inside their zone (no change of sky at the gates) ---
+# Ironforge, Undercity, The Exodar
+WeatherVibe.ZoneProfile.78=1537,DunMorogh
+WeatherVibe.ZoneProfile.79=1497,TirisfalGlades
+WeatherVibe.ZoneProfile.80=3557,AzuremystIsle
+
+# --- Outland (continued) ---
+# Nagrand, Terokkar Forest, Shattrath City
+WeatherVibe.ZoneProfile.81=3518,Nagrand
+WeatherVibe.ZoneProfile.82=3519,TerokkarForest
+WeatherVibe.ZoneProfile.83=3703,TerokkarForest
+
+# --- Northrend (continued) ---
+# Borean Tundra, Crystalsong Forest, Dalaran
+WeatherVibe.ZoneProfile.84=3537,BoreanTundra
+WeatherVibe.ZoneProfile.85=2817,CrystalsongForest
+WeatherVibe.ZoneProfile.86=4395,CrystalsongForest
+
+# --- Battlegrounds (continued) ---
+# Alterac Valley, Warsong Gulch, Isle of Conquest
+WeatherVibe.ZoneProfile.87=2597,AlteracMountains
+WeatherVibe.ZoneProfile.88=3277,Ashenvale
+WeatherVibe.ZoneProfile.89=4710,FrozenSea
+
+
+#######################################################################################################
+#######################################################################################################
+# Area-to-Profile Mappings (microclimates)
+# Format: WeatherVibe.AreaProfile.<N> = areaId,ProfileName
+# An area's own profile beats its zone's for anyone standing in it. The weather
+# changes as you walk in and back out. Use the id of the innermost area -
+# .wvibe where prints it - and map each sub-area you want covered.
+#######################################################################################################
+#######################################################################################################
+
+# --- Western Plaguelands: the four cauldron fields ---
+# Felstone Field, Dalson's Tears, Gahrron's Withering, The Writhing Haunt
+WeatherVibe.AreaProfile.1=199,PlagueCauldron
+WeatherVibe.AreaProfile.2=200,PlagueCauldron
+WeatherVibe.AreaProfile.3=201,PlagueCauldron
+WeatherVibe.AreaProfile.4=202,PlagueCauldron
+
+# --- Borean Tundra: Naxxanar ---
+WeatherVibe.AreaProfile.5=4128,ScourgeShadow
+
+# --- Storm Peaks: Valley of Ancient Winters ---
+WeatherVibe.AreaProfile.6=4437,AncientWinter
+
+# --- Icecrown: Argent Tournament Grounds and its rings and pavilions ---
+WeatherVibe.AreaProfile.7=4658,ArgentTournament
+WeatherVibe.AreaProfile.8=4669,ArgentTournament
+WeatherVibe.AreaProfile.9=4670,ArgentTournament
+WeatherVibe.AreaProfile.10=4671,ArgentTournament
+WeatherVibe.AreaProfile.11=4672,ArgentTournament
+WeatherVibe.AreaProfile.12=4673,ArgentTournament
+WeatherVibe.AreaProfile.13=4676,ArgentTournament
+WeatherVibe.AreaProfile.14=4677,ArgentTournament
+
+
+#######################################################################################################
+#######################################################################################################
+# Neighbours (weather fronts)
+# Format: WeatherVibe.Profile.<Name>.Neighbors = ProfileA, ProfileB, ...
+# Whose storms drift here - see WeatherVibe.Front.Strength. A border has two
+# sides: naming a neighbour once links both profiles, so each border is listed
+# once below.
+#######################################################################################################
+#######################################################################################################
+
+# --- Eastern Kingdoms ---
+WeatherVibe.Profile.ElwynnForest.Neighbors=Westfall, Duskwood, RedridgeMountains
+WeatherVibe.Profile.Westfall.Neighbors=Duskwood
+WeatherVibe.Profile.Duskwood.Neighbors=DeadwindPass, StranglethornVale
+WeatherVibe.Profile.DeadwindPass.Neighbors=SwampOfSorrows
+WeatherVibe.Profile.SwampOfSorrows.Neighbors=BlastedLands
+WeatherVibe.Profile.RedridgeMountains.Neighbors=BurningSteppes
+WeatherVibe.Profile.BurningSteppes.Neighbors=BlackrockMountain
+WeatherVibe.Profile.BlackrockMountain.Neighbors=SearingGorge
+WeatherVibe.Profile.SearingGorge.Neighbors=Badlands, LochModan
+WeatherVibe.Profile.Badlands.Neighbors=LochModan
+WeatherVibe.Profile.LochModan.Neighbors=DunMorogh, Wetlands
+WeatherVibe.Profile.DunMorogh.Neighbors=Wetlands
+WeatherVibe.Profile.Wetlands.Neighbors=ArathiHighlands
+WeatherVibe.Profile.ArathiHighlands.Neighbors=HillsbradFoothills
+WeatherVibe.Profile.HillsbradFoothills.Neighbors=AlteracMountains, TheHinterlands, SilverpineForest
+WeatherVibe.Profile.AlteracMountains.Neighbors=WesternPlaguelands
+WeatherVibe.Profile.TheHinterlands.Neighbors=WesternPlaguelands
+WeatherVibe.Profile.SilverpineForest.Neighbors=TirisfalGlades
+WeatherVibe.Profile.TirisfalGlades.Neighbors=WesternPlaguelands
+WeatherVibe.Profile.WesternPlaguelands.Neighbors=EasternPlaguelands
+WeatherVibe.Profile.EasternPlaguelands.Neighbors=Ghostlands, ScarletEnclave
+WeatherVibe.Profile.Ghostlands.Neighbors=EversongWoods
+WeatherVibe.Profile.EversongWoods.Neighbors=IsleOfQuelDanas
+WeatherVibe.Profile.TheGreatSea.Neighbors=StranglethornVale, Westfall, Darkshore, Azshara, Durotar
+
+# --- Kalimdor ---
+WeatherVibe.Profile.Durotar.Neighbors=TheBarrens
+WeatherVibe.Profile.TheBarrens.Neighbors=Mulgore, StonetalonMountains, Ashenvale, DustwallowMarsh, ThousandNeedles
+WeatherVibe.Profile.StonetalonMountains.Neighbors=Ashenvale, Desolace
+WeatherVibe.Profile.Ashenvale.Neighbors=Darkshore, Felwood, Azshara
+WeatherVibe.Profile.Felwood.Neighbors=Winterspring, Moonglade
+WeatherVibe.Profile.Moonglade.Neighbors=Winterspring
+WeatherVibe.Profile.Desolace.Neighbors=Feralas
+WeatherVibe.Profile.Feralas.Neighbors=ThousandNeedles
+WeatherVibe.Profile.ThousandNeedles.Neighbors=Tanaris
+WeatherVibe.Profile.Tanaris.Neighbors=UnGoroCrater
+WeatherVibe.Profile.UnGoroCrater.Neighbors=Silithus
+WeatherVibe.Profile.Silithus.Neighbors=AhnQiraj
+WeatherVibe.Profile.AzuremystIsle.Neighbors=BloodmystIsle
+
+# --- Outland ---
+WeatherVibe.Profile.HellfirePeninsula.Neighbors=Zangarmarsh, TerokkarForest
+WeatherVibe.Profile.Zangarmarsh.Neighbors=Nagrand, BladesEdgeMountains, TerokkarForest
+WeatherVibe.Profile.TerokkarForest.Neighbors=Nagrand, ShadowmoonValley
+WeatherVibe.Profile.BladesEdgeMountains.Neighbors=Netherstorm
+WeatherVibe.Profile.Netherstorm.Neighbors=EyeOfTheStorm
+
+# --- Northrend ---
+WeatherVibe.Profile.BoreanTundra.Neighbors=Dragonblight, SholazarBasin, Wintergrasp, FrozenSea
+WeatherVibe.Profile.HowlingFjord.Neighbors=GrizzlyHills, Dragonblight, FrozenSea
+WeatherVibe.Profile.Dragonblight.Neighbors=GrizzlyHills, ZulDrak, CrystalsongForest, Wintergrasp, Icecrown
+WeatherVibe.Profile.GrizzlyHills.Neighbors=ZulDrak
+WeatherVibe.Profile.ZulDrak.Neighbors=CrystalsongForest, StormPeaks
+WeatherVibe.Profile.CrystalsongForest.Neighbors=StormPeaks, Icecrown
+WeatherVibe.Profile.StormPeaks.Neighbors=Icecrown
+WeatherVibe.Profile.Icecrown.Neighbors=Wintergrasp
+WeatherVibe.Profile.SholazarBasin.Neighbors=Wintergrasp
+
+
+#######################################################################################################
+#######################################################################################################
+# Holiday overlays
+# Format: WeatherVibe.Holiday.<holidayId>.<ProfileName>.<N> = weight, weatherType, intensityMinPct, intensityMaxPct
+# Extra rows added to a profile's table while that holiday is running. They
+# compete with the profile's own rows by weight, like any other entry.
+# Holiday ids (Holidays.dbc): 141 Feast of Winter Veil, 324 Hallow's End,
+# 341 Midsummer Fire Festival, 327 Lunar Festival, 372 Brewfest, 404 Pilgrim's
+# Bounty, 321 Harvest Festival, 181 Noblegarden, 423 Love is in the Air.
+# Remove a line to drop it; remove them all and holidays change nothing.
+#######################################################################################################
+#######################################################################################################
+
+# --- Feast of Winter Veil: snow where it rarely falls ---
+WeatherVibe.Holiday.141.ElwynnForest.1=25,6,20,50
+WeatherVibe.Holiday.141.ElwynnForest.2=8,7,20,40
+WeatherVibe.Holiday.141.TirisfalGlades.1=20,6,20,50
+WeatherVibe.Holiday.141.Mulgore.1=12,6,20,40
+WeatherVibe.Holiday.141.Teldrassil.1=12,6,20,40
+
+# --- Hallow's End: the mist comes down ---
+WeatherVibe.Holiday.324.TirisfalGlades.1=30,1,50,90
+WeatherVibe.Holiday.324.SilverpineForest.1=25,1,50,90
+WeatherVibe.Holiday.324.Duskwood.1=25,1,60,95
+WeatherVibe.Holiday.324.ElwynnForest.1=15,1,40,70
+
+# --- Midsummer Fire Festival: long clear days ---
+WeatherVibe.Holiday.341.ElwynnForest.1=30,0,90,100
+WeatherVibe.Holiday.341.Durotar.1=30,0,90,100
+WeatherVibe.Holiday.341.Mulgore.1=30,0,90,100
+WeatherVibe.Holiday.341.Teldrassil.1=30,0,90,100
+WeatherVibe.Holiday.341.TirisfalGlades.1=20,0,60,90
+WeatherVibe.Holiday.341.EversongWoods.1=30,0,90,100
+
+# --- Lunar Festival: clear skies over Moonglade ---
+WeatherVibe.Holiday.327.Moonglade.1=40,0,90,100

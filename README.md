@@ -2,250 +2,236 @@
 
 [![Intro!](https://i3.ytimg.com/vi/iCn14KLCerY/maxresdefault.jpg)](https://www.youtube.com/watch?v=iCn14KLCerY)
 
-- New version!
-- demo: https://youtu.be/GRyTk5umEno
-- another demo: https://youtu.be/23jTJcT-n44
-- **Pull request**: tweaking weather profiles are more then welcome
+Weather that belongs to the place it falls on. Each zone has a **profile**: what the sky does
+there in each season, how hard, and how quickly it changes. Elwynn is mild with misty mornings,
+Duskwood never quite clears, Stranglethorn gets real downpours, the Storm Peaks get real
+blizzards. Weather builds and eases a step at a time, drifts between neighbouring zones, and
+turns gradually with the calendar.
 
-Bring your world to life with **mod_weather_vibe**. This module gives each zone a
-distinct **mood** — misty mornings in Elwynn, a **gloomy** Duskwood that rumbles to life,
-**biting** Wintergrasp squalls, and **rolling thunderheads** over Stranglethorn. Weather
-no longer just _flips_; it **evolves** naturally over time with smooth intensity
-transitions, seasonal awareness, fog as a natural bridge between states, and
-regional syncing that makes the world feel **alive** and **immersive**.
+This is a fork of [hermensbas/mod_weather_vibe](https://github.com/hermensbas/mod_weather_vibe).
+The profiles and the idea are that project's; the engine, delivery and world features were
+reworked here. Demos of the original: <https://youtu.be/GRyTk5umEno>, <https://youtu.be/23jTJcT-n44>.
 
-> ✅ **Important:** In your core config (worldserver.conf) set `ActivateWeather = 0`.
-> That disables the default `WeatherMgr` so it won't fight WeatherVibe's packets.
+> **Required:** set `ActivateWeather = 0` in `worldserver.conf`. Otherwise the core's own
+> weather fights this module. The module logs an error at startup if it is still on.
 
 ---
 
-## Features
+## What it does
 
-- **Packet mode** — sends `WorldPackets::Misc::Weather` directly to zones via `SendZoneMessage`.
-- **Per-state intensity bands** — define min/max raw grade per weather state and daypart. The engine maps a logical percentage (0–100) to the configured raw grade range.
-- **Season-aware profiles** — each profile defines weighted weather entries per season (Spring, Summer, Autumn, Winter). Seasons are computed from server time or forced via config.
-- **Smooth transitions** — weather doesn't snap between states. The engine fades out the old state, fades in the new one, with configurable step sizes and timing. Same-family transitions (e.g. LightSnow → HeavySnow) use crossfade; cross-family transitions (e.g. Rain → Snow) fade through zero.
-- **Natural escalation** — the engine enforces tier-stepping: you can't jump from Fine to HeavyRain in one pick. Weather must escalate through Light → Medium → Heavy within a family.
-- **Fog bridge boost** — fog gets a natural weight boost when transitioning between clear skies and precipitation (or vice versa), making it appear as a realistic "something's coming" or "clearing up" signal.
-- **Minimum hold time** — weather lingers at its target intensity for a configurable minimum duration before the next change, so players actually experience the weather.
-- **Season blending** — when the season changes, the previous season's weather entries gradually fade out over a configurable window instead of switching instantly.
-- **Periodic reapply** — the current weather is periodically re-broadcast to catch late joiners or clients that lost state, with staggered timing across profiles to avoid packet bursts.
-- **Zone syncing** — multiple zones sharing the same profile name get identical weather, same transitions, same timing (e.g. Stormwind synced with Elwynn Forest).
-- **Login & zone-change delivery** — players receive the current weather on login and when changing zones.
-- **Admin commands** — `.wvibe set`, `.wvibe setRaw`, `.wvibe show` for manual control and inspection.
-
----
-
-## Contents
-
-- [Installation](#installation)
-- [Configuration](#configuration)
-  - [Core toggles & debug](#core-toggles--debug)
-  - [Season & Dayparts](#season--dayparts)
-  - [Intensity ranges](#intensity-ranges)
-  - [Weather profiles](#weather-profiles)
-  - [Transition settings](#transition-settings)
-  - [Zone-to-profile mapping and synced zones](#zone-to-profile-mapping-and-synced-zones)
-  - [Reapply interval](#reapply-interval)
-- [Commands](#commands)
-- [How it works](#how-it-works)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+- **Profiles per zone.** Weighted weather tables per season, per profile. Zones that share a
+  profile share one sky: Stormwind and Elwynn, Orgrimmar and Durotar, a battleground and the
+  zone it stands for.
+- **Every map.** Open world, battlegrounds, raids and dungeons all work the same way.
+- **Only real players are told.** Playerbots never receive a weather packet.
+- **Smooth changes.** Intensity moves continuously in small eased steps. Light rain becomes
+  medium rain without a dip; a clear sky clouds over before the first drops.
+- **One step at a time.** From a calm sky weather starts light; medium follows light, heavy
+  follows medium, and it eases off the same way. A thunderstorm grows out of real rain.
+- **Weights mean what they say.** A state with 10% of a table's weight is in the sky about 10%
+  of the time, including the heavy tiers that stepping would otherwise starve.
+- **Time of day.** Mist at dawn and after dark, thunder in the afternoon and evening.
+- **Seasons that turn gradually.** Around each equinox and solstice the two seasons' tables
+  are mixed.
+- **Weather fronts.** Heavy weather in a neighbouring zone makes the same weather likelier
+  here, if this zone has that kind of weather at all. A desert never inherits snow.
+- **Microclimates.** A single area can have its own profile inside its zone: the plague
+  cauldron fields, a valley where the blizzard never stops.
+- **Holidays.** Snow over Elwynn at Winter Veil, mist at Hallow's End, clear skies at Midsummer.
+- **The world notices.** Now and then an NPC standing near you remarks that the weather has
+  turned. Lua scripts are told too, so events can follow the weather.
+- **Live tuning.** `.wvibe reload` re-reads the config without resetting the sky.
 
 ---
 
 ## Installation
 
-1. Place the module in your AzerothCore `modules` folder:
-   ```
-   azerothcore/modules/mod-weather-vibe/
-   ```
-2. Reconfigure & build:
-   ```bash
-   cmake .. -DCMAKE_BUILD_TYPE=Release
-   make -j"$(nproc)"
-   ```
-3. In your worldserver config, set:
-   ```ini
-   ActivateWeather = 0
-   ```
-4. Copy `mod_weather_vibe.conf.dist` to your config directory and adjust as needed, then start `worldserver`.
+1. Put the module in your AzerothCore `modules` folder and rebuild.
+2. In `worldserver.conf` set `ActivateWeather = 0`.
+3. Install `mod_weather_vibe.conf.dist` in your config's `modules` folder and start the server.
 
----
+### The `.conf` and the `.conf.dist`
 
-## Configuration
+AzerothCore only reads a key from `mod_weather_vibe.conf` if `mod_weather_vibe.conf.dist` has
+the same key. Changing a value in your `.conf` always works. **Adding** a line does not, unless
+you add it to the `.conf.dist` too. This matters here because much of the config is numbered
+lines you are meant to add to: zone mappings, profile rows, areas, remarks.
 
-### Core toggles & debug
+The simplest setup is to keep no `.conf` and edit the installed `.conf.dist`.
 
-```ini
-WeatherVibe.Enable = 1
-WeatherVibe.Debug = 0
+### Upgrading from an older version
 
-# Toggle the automatic weather profile engine.
-# When disabled, manual .wvibe set / setRaw commands still work.
-WeatherVibe.Profile.Enable = 1
-
-# How often (seconds) the engine re-broadcasts the current weather
-# as a safety net for late joiners. 0 = disabled.
-WeatherVibe.Profile.ReApply.PerSec = 10
-```
-
-### Season & Dayparts
-
-```ini
-# auto computes from server date. Force with: spring|summer|autumn|winter
-WeatherVibe.Season = auto
-
-# auto computes from server clock. Force with: morning|afternoon|evening|night
-WeatherVibe.DayPart.Mode = auto
-
-# Daypart boundaries (HH:MM)
-WeatherVibe.DayPart.MORNING.Start   = 06:00
-WeatherVibe.DayPart.AFTERNOON.Start = 12:00
-WeatherVibe.DayPart.EVENING.Start   = 18:00
-WeatherVibe.DayPart.NIGHT.Start     = 22:00
-```
-
-### Intensity ranges
-
-These map a **logical percentage (0–100)** to a **raw grade (0.0–1.0)** per daypart and weather state. The WoW client generally shows weather effects from ~0.30 raw grade upward; Fine is visible from 0.00 (clear sky).
-
-```ini
-# Format: WeatherVibe.Intensity.InternalRange.<DAYPART>.<StateName> = <minRaw>, <maxRaw>
-WeatherVibe.Intensity.InternalRange.MORNING.Fine       = 0.00, 0.30
-WeatherVibe.Intensity.InternalRange.MORNING.Fog        = 0.15, 0.30
-WeatherVibe.Intensity.InternalRange.MORNING.LightRain  = 0.25, 0.50
-WeatherVibe.Intensity.InternalRange.MORNING.MediumRain = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.MORNING.HeavyRain  = 0.25, 0.90
-# ... repeat for AFTERNOON, EVENING, NIGHT and all states
-```
-
-**Supported states:** `Fine (0)`, `Fog (1)`, `LightRain (3)`, `MediumRain (4)`, `HeavyRain (5)`, `LightSnow (6)`, `MediumSnow (7)`, `HeavySnow (8)`, `LightSandstorm (22)`, `MediumSandstorm (41)`, `HeavySandstorm (42)`, `Thunders (86)`.
-
-### Weather profiles
-
-Each profile defines weighted weather entries per season. Entries use numbered suffixes (`.1`, `.2`, `.3`, ...) and follow the format: `weight, weatherType, intensityMinPct, intensityMaxPct`.
-
-```ini
-# DunMorogh Spring: snow dominant, some fog, rare sleet
-WeatherVibe.Profile.DunMorogh.Spring.1 = 10,0,40,70    # Fine, weight 10, 40-70%
-WeatherVibe.Profile.DunMorogh.Spring.2 = 15,1,30,60    # Fog, weight 15, 30-60%
-WeatherVibe.Profile.DunMorogh.Spring.3 = 5,3,30,50     # LightRain, weight 5
-WeatherVibe.Profile.DunMorogh.Spring.4 = 40,6,30,50    # LightSnow, weight 40
-WeatherVibe.Profile.DunMorogh.Spring.5 = 15,7,30,70    # MediumSnow, weight 15
-WeatherVibe.Profile.DunMorogh.Spring.6 = 10,8,30,80    # HeavySnow, weight 10
-```
-
-The engine picks a state by weighted random selection, then picks an intensity uniformly within the entry's min/max percentage range, which is then mapped through the InternalRange for the current daypart.
-
-### Transition settings
-
-Each profile has its own transition tuning:
-
-```ini
-# How long (seconds) each intensity step takes (randomized within range)
-WeatherVibe.Profile.DunMorogh.Transition.Step.TimeSeconds.Min = 15
-WeatherVibe.Profile.DunMorogh.Transition.Step.TimeSeconds.Max = 35
-
-# How much intensity changes per step (percentage points)
-WeatherVibe.Profile.DunMorogh.Transition.StepSize.Perc = 20
-
-# Maximum weather changes per hour (budget system)
-WeatherVibe.Profile.DunMorogh.Transition.Max.Changes.Per.Hour = 12
-
-# Force variety: max consecutive picks of the same state before forcing a change
-WeatherVibe.Profile.DunMorogh.Transition.Max.Consecutive.Same = 2
-
-# Minimum seconds weather holds at target after a transition completes
-WeatherVibe.Profile.DunMorogh.Transition.MinHoldSeconds = 60
-
-# Minutes to blend the previous season's entries after a season change (0 = instant)
-WeatherVibe.Profile.DunMorogh.Transition.SeasonBlendMinutes = 10
-```
-
-### Zone-to-profile mapping and synced zones
-
-Assign zones to profiles using numbered entries in the format `<zoneId>,<ProfileName>`.
-
-```ini
-# Format: WeatherVibe.ZoneProfile.<N> = <zoneId>,<ProfileName>
-WeatherVibe.ZoneProfile.1  = 1,DunMorogh         # Dun Morogh
-WeatherVibe.ZoneProfile.2  = 12,ElwynnForest      # Elwynn Forest
-WeatherVibe.ZoneProfile.3  = 1519,ElwynnForest    # Stormwind synced to Elwynn
-```
-
-**How synced zones work:** When multiple zones reference the **same profile name**, the engine treats them as a single weather unit. They share one state machine — one set of timers, one transition phase, one current intensity. Every weather broadcast goes to all zones in the group simultaneously, so players in any of those zones see identical weather at all times.
-
-This is designed for **connected areas** where it would break immersion if the weather changed as you walked through a gate or border. Typical uses:
-
-- **Cities within their outdoor zone** — Stormwind (1519) shares the `ElwynnForest` profile with Elwynn Forest (12), so stepping through the gates doesn't change the sky.
-- **Split zones that feel like one area** — Orgrimmar (1637) synced to Durotar (14), Ironforge (1537) synced to Dun Morogh (1), Thunder Bluff (1638) synced to The Barrens (17).
-- **Battleground instances** — Arathi Basin (3358) shares `ArathiHighlands` so the battleground has the same weather as the outdoor zone.
-
-Each profile name only creates **one** weather engine instance regardless of how many zones are mapped to it. Adding more zones to a profile has zero performance cost — it just adds zone IDs to the broadcast list.
-
-### Reapply interval
-
-The engine periodically re-broadcasts weather during hold phases to ensure late joiners see the correct weather. Timing is staggered across profiles to avoid packet bursts.
-Aside of having core hook when player enters a zone changed and reapplying the weather, the reapply is simple extra measure to assure the correct weather.
-
-```ini
-# Seconds between re-broadcasts (0 = disabled, default = 30)
-WeatherVibe.Profile.ReApply.PerSec = 30
-```
+- Replace your `.conf` with the new `.conf.dist` and re-apply your own changes. An old `.conf`
+  still loads, but it overrides the corrected profile data and the new defaults with the old
+  values.
+- `Transition.SeasonBlendMinutes` is retired (seasons now blend by calendar). An old `.conf`
+  that still has those lines logs "Found incorrect option" for each at startup; delete them.
+- `WeatherVibe.Debug` no longer prints anything to players. It writes to the server log.
 
 ---
 
 ## Commands
 
-All commands require GM administrator level.
+Read-only commands are GM-only unless `WeatherVibeCommand = 1`. Commands that change the
+weather are always GM-only; `reload` needs administrator level.
 
-| Command | Description |
-|---------|-------------|
-| `.wvibe set <zoneId> <state> <percentage>` | Set weather using logical percentage (mapped through InternalRange for current daypart) |
-| `.wvibe setRaw <zoneId> <state> <raw>` | Set weather using raw grade directly (0.0–1.0, bypasses mapping) |
-| `.wvibe show` | List last-applied weather for all active zones |
+| Command | What it does |
+|---|---|
+| `.wvibe status` | Season, daypart, and one line per profile |
+| `.wvibe status here` / `<profile>` | That profile in detail: state, intensity, time to the next change, what it covers, its neighbours |
+| `.wvibe where` | Zone and area ids and names where you stand, and the profile that covers them |
+| `.wvibe set <zoneId> <state> <pct>` | Send that zone's profile there; afterwards it carries on by itself |
+| `.wvibe force <here\|profile> <state> <pct> [minutes]` | Go there and stay, for that long or until released |
+| `.wvibe resume [here\|profile\|all]` | Release a forced profile |
+| `.wvibe next [here\|profile]` | Pick the next weather now |
+| `.wvibe setRaw <zoneId> <state> <raw>` | Calibration: snap to a raw grade (0..1) and stay there until `resume` |
+| `.wvibe simulate <here\|profile> [hours]` | Run the real selection rules and print how much of the time each state gets |
+| `.wvibe debug on\|off` | See the engine's decisions in chat for the weather you stand in |
+| `.wvibe reload` | Re-read the config files and re-apply this module; running weather is kept |
 
-**Examples:**
-```
-.wvibe set 1 6 40       # Zone 1, LightSnow (6), 40%
-.wvibe setRaw 1 6 0.55  # Zone 1, LightSnow (6), raw grade 0.55
-```
+`<state>` is a number or a name: `0 Fine`, `1 Fog`, `3 LightRain`, `4 MediumRain`,
+`5 HeavyRain`, `6 LightSnow`, `7 MediumSnow`, `8 HeavySnow`, `22 LightSandstorm`,
+`41 MediumSandstorm`, `42 HeavySandstorm`, `86 Thunders`.
+
+`set`, `force` and `setRaw` act on the whole profile, so synced zones stay in sync.
 
 ---
 
-## How it works
+## Configuration
 
-1. **Profile loading** — on startup, the engine reads all profile entries and zone mappings from config. Profiles are loaded once; zones sharing a profile name share a single weather state machine.
+Everything is in `mod_weather_vibe.conf.dist`, with a comment on each key. The outline:
 
-2. **State selection** — the engine picks a weather state using weighted random selection with three-pass fallback: first it tries natural transitions (tier ±1) while respecting the consecutive-same limit, then natural transitions without the limit, then any entry as a last resort. Fog gets a weight boost when it would serve as a natural bridge between clear and precipitation.
+### Profiles
 
-3. **Transition execution** — once a target is picked, the engine steps intensity toward the target in configurable increments. Cross-state transitions use a two-phase fade: fade out the old state, then fade in the new. Same-family transitions (e.g. LightSnow → HeavySnow) crossfade smoothly. Each step broadcasts the current intensity to all zones in the profile.
+```ini
+# WeatherVibe.Profile.<Name>.<Season>.<N> = weight, state, intensityMinPct, intensityMaxPct
+WeatherVibe.Profile.DunMorogh.Spring.1=10,0,40,70
+WeatherVibe.Profile.DunMorogh.Spring.2=15,1,30,60
+WeatherVibe.Profile.DunMorogh.Spring.4=40,6,30,70
+```
 
-4. **Hold phase** — after arriving at the target intensity, the weather holds for at least `MinHoldSeconds` or the remaining interval budget, whichever is longer. During the hold, periodic re-broadcasts ensure late joiners see the correct weather.
+A row is one kind of weather: how often (its weight against the other rows) and how strong
+(a percentage range). For `Fine` the percentage is how clear the sky is: 100 is cloudless, low
+is overcast. A profile may leave a season out; it then borrows a neighbouring one.
 
-5. **Season awareness** — seasons are computed from server date (or forced via config). When the season changes, entries from the previous season remain eligible for a configurable blending window, with weights gradually fading to zero.
+Per profile, under `WeatherVibe.Profile.<Name>.`:
 
-6. **Client delivery** — on login and zone change, the `PlayerScript` pushes the last-applied weather to the player's client so they immediately see the current conditions.
+| Key | Meaning |
+|---|---|
+| `Transition.Max.Changes.Per.Hour` | How often the weather changes |
+| `Transition.MinHoldSeconds` | Least time weather stays once it has arrived |
+| `Transition.Step.TimeSeconds.Min/Max`, `Transition.StepSize.Perc` | How long a change takes: one step of time per `StepSize.Perc` of intensity travelled |
+| `Transition.Max.Consecutive.Same` | Same state in a row before a different one is wanted |
+| `DayPartWeight.<DAYPART>.<State>` | This profile's own time-of-day multiplier |
+| `Neighbors` | Profiles whose storms drift here |
+
+### Where a profile applies
+
+```ini
+WeatherVibe.ZoneProfile.7=12,ElwynnForest      # zone id, profile
+WeatherVibe.ZoneProfile.8=1519,ElwynnForest    # Stormwind shares Elwynn's sky
+WeatherVibe.AreaProfile.1=199,PlagueCauldron   # one area inside a zone
+```
+
+An area's profile beats its zone's. Use the id of the innermost area; `.wvibe where` prints
+it. Ids are checked at startup, and anything unknown is reported in the server log.
+
+### Global
+
+| Key | Default | Meaning |
+|---|---|---|
+| `WeatherVibe.Pace` | 1.0 | Multiplies every profile's changes per hour. 0.5 = weather lasts twice as long |
+| `WeatherVibe.Hold.<State>` | 0.6 to 1.5 | How long each kind of weather lingers. Storms pass, fine spells last |
+| `WeatherVibe.Escalation.Strict` | 1 | Step a tier at a time in both directions, and balance picks to the weights |
+| `WeatherVibe.FogBridge.Boost` | 1.5 | Extra fog weight when the sky is clear or the weather light |
+| `WeatherVibe.Front.Strength` | 1.5 | How strongly neighbours' storms pull. 0 = off |
+| `WeatherVibe.Season.BlendDays` | 30 | Days either side of a season boundary over which tables mix. 0 = overnight |
+| `WeatherVibe.DayPartWeight.<DAYPART>.<State>` | see file | Time-of-day multiplier for all profiles |
+| `WeatherVibe.Intensity.InternalRange.<DAYPART>.<State>` | see file | The raw grade band a state's 0..100% maps onto |
+| `WeatherVibe.Holiday.<holidayId>.<Profile>.<N>` | see file | Extra rows while a holiday runs |
+| `WeatherVibe.Remarks.*` | on, 15%, 30 min | NPC remarks and their lines |
+| `WeatherVibe.Hook.Enable` / `.ResyncMinutes` | 1 / 10 | The weather-change hook for other scripts |
+
+### Check before you deploy
+
+```bash
+python tools/wv_lint.py conf/mod_weather_vibe.conf.dist
+python tools/wv_lint.py conf/mod_weather_vibe.conf.dist --stats   # share of each kind of weather
+```
+
+Reports typos (a minimum above a maximum), duplicate rows, a profile that contradicts its own
+header ("no snow" with a snow row), tiers that can rarely be reached, unmapped profiles and
+unknown keys. It reads only the file; it cannot tell whether an id is the place you meant.
+
+---
+
+## Reacting to the weather from Lua
+
+When a profile's weather settles, the module fires the core's weather-change hook for each of
+its open-world zones. With mod-ale that is server event 25:
+
+```lua
+local RAIN = { [3] = true, [4] = true, [5] = true, [86] = true }
+
+RegisterServerEvent(25, function(event, zoneId, state, grade)
+    if zoneId == 12 and RAIN[state] then
+        -- it is raining in Elwynn
+    end
+end)
+```
+
+The event repeats every `Hook.ResyncMinutes`, so a script loaded with `.reload ale` learns the
+current weather without waiting for it to change. Battleground and raid zones do not fire it.
+
+Do not set weather from Lua with `Map:SetWeather`. It creates a core weather object that keeps
+regenerating on its own and fights this module in that zone. Use `.wvibe force` or `.wvibe set`.
+
+---
+
+## Calibrating to your client
+
+What a grade looks like is decided by the client, and clients differ (HD patches especially).
+Two defaults are worth five minutes of checking, standing outdoors in a mapped zone:
+
+| Try | Look for | If not |
+|---|---|---|
+| `.wvibe setRaw <zone> 0 0.0`, then `0 0.3` | The sky at 0.3 is duller but nothing falls | Lower Fine's `InternalRange` maximum |
+| `.wvibe setRaw <zone> 3 0.6`, then `4 0.6` | Light and medium rain look the same at the same grade | Make the Light/Medium/Heavy ranges contiguous instead of overlapping |
+| `.wvibe setRaw <zone> 3 0.25` | Rain is just barely visible | Raise or lower the rain ranges' minimum to where it first shows |
+| `.wvibe setRaw <zone> 86 0.3` | What Thunders draws on your client | Adjust its range, or its weights |
+
+`.wvibe resume` when done.
 
 ---
 
 ## Troubleshooting
 
-**Weather stops after a few seconds** — confirm `ActivateWeather = 0` in your core config. The default `WeatherMgr` will overwrite WeatherVibe's packets if left enabled.
+**The weather keeps snapping back.** `ActivateWeather` is still 1, or a script is calling
+`Map:SetWeather`.
 
-**Weather changes too quickly** — increase `MinHoldSeconds` so weather lingers longer. Decrease `Max.Changes.Per.Hour` to reduce the hourly budget. Increase `Max.Consecutive.Same` to allow longer stretches of the same state.
+**A zone has no weather.** `.wvibe where` shows whether a profile covers it. Check the server
+log from startup for a warning about that id or profile.
 
-**Weather never changes** — check that `WeatherVibe.Profile.Enable = 1` and that the zone has a valid profile mapping. Use `.wvibe show` to see the current state. Enable `WeatherVibe.Debug = 1` to see transition events in zone chat.
+**I added a mapping and it does nothing.** It is only in your `.conf`. Add it to the
+`.conf.dist` too (see above).
 
-**`.wvibe set` looks different from `.wvibe setRaw`** — `.wvibe set` passes through percentage mapping (depends on your InternalRange and current daypart). `.wvibe setRaw` sends the raw grade directly. If they look different, your InternalRange doesn't map linearly to 0–1.
+**Weather changes too often, or not often enough.** `WeatherVibe.Pace` for everything; a
+profile's `Max.Changes.Per.Hour` and `MinHoldSeconds` for one place; `WeatherVibe.Hold.<State>`
+for one kind of weather.
 
-**Weather looks too weak or too strong** — adjust the InternalRange for that state and daypart. Narrowing the range constrains how intense the effect can get; shifting it up makes even low percentages more visible.
+**It is never heavy enough, or too often.** `.wvibe simulate <profile> 200` prints what the
+table really delivers. Change the weights and `.wvibe reload`.
 
-**Zones not syncing** — ensure both zones reference the exact same profile name in the `ZoneProfile` mapping. Profile names are case-sensitive.
+**A boss fight's weather.** Zones without a profile are left to the core, so scripted weather
+in raids and dungeons shows as intended. If you map a zone that a core script also drives, the
+profile wins.
 
 ---
 
+## How it works
+
+[DESIGN.md](DESIGN.md) has the architecture and the reasons behind it.
+
 ## License
 
-This module follows the same license policy as your AzerothCore distribution unless stated otherwise in the repository. Contributions welcome — profiles and zone mappings are great PRs!
+Same license as the upstream project; see [LICENSE](LICENSE).

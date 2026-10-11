@@ -1,47 +1,107 @@
+#include "mod_weather_vibe.h"
 #include "mod_wv_core.h"
+#include "mod_wv_engine.h"
 
 #include "Chat.h"
 #include "ChatCommand.h"
 #include "Config.h"
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "StringFormat.h"
+#include "WorldSession.h"
 
-#include <iomanip>
-#include <sstream>
+#include <algorithm>
 
 using Acore::ChatCommands::ChatCommandTable;
 using Acore::ChatCommands::Console;
+using namespace WeatherVibe;
 
-// ============================================================
-// Helper – runtime permission gate.
-// WeatherVibeCommand = 0  -> GM only (default)
-// WeatherVibeCommand = 1  -> everyone
-// Returns true if the caller is allowed to use commands.
-// ============================================================
-static bool HasWvibePermission(ChatHandler* handler)
+namespace
 {
-    if (sConfigMgr->GetOption<int32>("WeatherVibeCommand", 0) == 1)
-        return true;
-
-    Player* player = handler->GetPlayer();
-    if (!player)
-        return true; // console always allowed
-
-    if (player->GetSession()->GetSecurity() < SEC_GAMEMASTER)
+    void Reply(ChatHandler* handler, std::string const& text)
     {
-        handler->SendSysMessage("|cff00ff00WeatherVibe:|r Commands are restricted to GMs.");
+        handler->SendSysMessage("|cff00ff00WeatherVibe:|r " + text);
+    }
+
+    bool Fail(ChatHandler* handler, std::string const& text)
+    {
+        Reply(handler, text);
+        handler->SetSentErrorMessage(true);
         return false;
     }
 
-    return true;
+    // ============================================================
+    // Runtime permission gate for the read-only commands.
+    // WeatherVibeCommand = 0  -> GM only (default)
+    // WeatherVibeCommand = 1  -> everyone
+    // Anything that changes the weather is GM-only in the command table itself.
+    // ============================================================
+    bool MayRead(ChatHandler* handler)
+    {
+        if (handler->IsConsole() || sWeatherVibeCore.PlayersMayRead())
+            return true;
+
+        if (handler->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+            return true;
+
+        return Fail(handler, "Commands are restricted to GMs.");
+    }
+
+    bool Ready(ChatHandler* handler)
+    {
+        if (sWeatherVibeCore.IsEnabled())
+            return true;
+
+        return Fail(handler, "Module is disabled in config.");
+    }
+
+    // "here" is the profile the caller stands in; anything else is a profile name.
+    Profile* ProfileArg(ChatHandler* handler, std::string const& token)
+    {
+        if (token.empty() || ToLower(token) == "here")
+        {
+            Player* player = handler->GetPlayer();
+            if (!player)
+            {
+                Fail(handler, "Name a profile: 'here' needs a character.");
+                return nullptr;
+            }
+
+            Profile* profile = sWeatherVibeEngine.FindProfileFor(player->GetZoneId(), player->GetAreaId());
+            if (!profile)
+                Fail(handler, "No weather profile covers where you stand (see .wvibe where).");
+            return profile;
+        }
+
+        Profile* profile = sWeatherVibeEngine.FindProfile(token);
+        if (!profile)
+            Fail(handler, "Unknown profile '" + token + "' (.wvibe status lists them).");
+        return profile;
+    }
+
+    bool StateArg(ChatHandler* handler, std::string const& token, WeatherState& state)
+    {
+        if (WeatherVibeCore::ParseState(token, state))
+            return true;
+
+        return Fail(handler, "Invalid weather state '" + token + "'. Use .wvibe help for valid states.");
+    }
+
+    // Everywhere a profile's weather is seen, by name.
+    std::string CoverageOf(Profile const& profile)
+    {
+        std::string out;
+        for (uint32 zoneId : profile.zoneIds)
+            out += (out.empty() ? "" : ", ") + WeatherVibeCore::AreaName(zoneId);
+        for (uint32 areaId : profile.areaIds)
+            out += (out.empty() ? "" : ", ") + WeatherVibeCore::AreaName(areaId);
+        return out;
+    }
 }
 
 // ============================================================
 // CommandScript class
 // Each handler owns its validation, feedback and dispatch.
-// Core provides: AssertEnabled, PushWeatherPercent, ReloadConfig,
-//                GetLastApplied, GetCurrentDayPart, GetCurrentSeason,
-//                and the static name helpers.
 // ============================================================
 class WeatherVibe_CommandScript : public CommandScript
 {
@@ -49,102 +109,61 @@ public:
     WeatherVibe_CommandScript() : CommandScript("WeatherVibe_CommandScript") {}
 
     // ----------------------------------------------------------
-    // .wvibe set <zoneId> <state:uint> <percentage:0..100>
+    // .wvibe status [here|<profile>]
     // ----------------------------------------------------------
-    static bool HandleWvibeSet(ChatHandler* handler, uint32 zoneId, uint32 stateVal, float percentage)
+    static bool HandleWvibeStatus(ChatHandler* handler, Optional<std::string> target)
     {
-        if (!HasWvibePermission(handler))
+        if (!MayRead(handler) || !Ready(handler))
             return false;
 
-        if (!sWeatherVibeCore.IsEnabled())
+        SeasonBlend const blend = sWeatherVibeCore.GetSeasonBlend();
+        std::string season = WeatherVibeCore::SeasonName(blend.primary);
+        if (blend.secondaryShare > 0.005f)
+            season += Acore::StringFormat(" (+{:.0f}% {})", blend.secondaryShare * 100.0f,
+                WeatherVibeCore::SeasonName(blend.secondary));
+
+        Reply(handler, "season " + season + " | daypart "
+            + WeatherVibeCore::DayPartName(sWeatherVibeCore.GetCurrentDayPart()));
+
+        if (target)
         {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Module is disabled in config.");
-            return false;
-        }
+            Profile* profile = ProfileArg(handler, *target);
+            if (!profile)
+                return false;
 
-        if (!WeatherVibeCore::IsValidWeatherState(stateVal))
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Invalid weather state. Use .wvibe help for valid states.");
-            return false;
-        }
+            handler->SendSysMessage(sWeatherVibeEngine.Describe(*profile));
+            handler->SendSysMessage("  covers: " + CoverageOf(*profile));
 
-        bool ok = sWeatherVibeCore.PushWeatherPercent(zoneId, static_cast<WeatherState>(stateVal), percentage);
-        if (!ok)
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Failed to push weather (zone not found or no players).");
-        }
+            if (!profile->neighbors.empty())
+            {
+                std::string neighbours;
+                for (uint16 index : profile->neighbors)
+                {
+                    Profile const& other = sWeatherVibeEngine.GetProfiles()[index];
+                    neighbours += (neighbours.empty() ? "" : ", ") + other.name + " ("
+                        + WeatherVibeCore::WeatherStateName(other.live.targetState) + ")";
+                }
+                handler->SendSysMessage("  neighbours: " + neighbours);
+            }
 
-        return ok;
-    }
-
-    // ----------------------------------------------------------
-    // .wvibe setRaw <zoneId> <state:uint> <raw:0..1>
-    // ----------------------------------------------------------
-    static bool HandleWvibeSetRaw(ChatHandler* handler, uint32 zoneId, uint32 stateVal, float rawGrade)
-    {
-        if (!HasWvibePermission(handler))
-            return false;
-
-        if (!sWeatherVibeCore.IsEnabled())
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Module is disabled in config.");
-            return false;
-        }
-
-        if (!WeatherVibeCore::IsValidWeatherState(stateVal))
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Invalid weather state. Use .wvibe help for valid states.");
-            return false;
-        }
-
-        bool ok = sWeatherVibeCore.PushWeatherDebug(zoneId, static_cast<WeatherState>(stateVal), rawGrade);
-        if (!ok)
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Failed to push weather (zone not found or no players).");
-        }
-
-        return ok;
-    }
-
-    // ----------------------------------------------------------
-    // .wvibe show
-    // ----------------------------------------------------------
-    static bool HandleWvibeShow(ChatHandler* handler)
-    {
-        if (!HasWvibePermission(handler))
-            return false;
-
-        if (!sWeatherVibeCore.IsEnabled())
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r Module is disabled in config.");
-            return false;
-        }
-
-        auto const& lastApplied = sWeatherVibeCore.GetLastApplied();
-
-        if (lastApplied.empty())
-        {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r No weather pushed yet. Use .wvibe set or setRaw first.");
             return true;
         }
 
-        DayPart dp = sWeatherVibeCore.GetCurrentDayPart();
-        Season  s = sWeatherVibeCore.GetCurrentSeason();
+        std::vector<Profile const*> sorted;
+        for (Profile const& profile : sWeatherVibeEngine.GetProfiles())
+            sorted.push_back(&profile);
 
-        std::ostringstream oss;
-        oss << "|cff00ff00WeatherVibe:|r show | season=" << WeatherVibeCore::SeasonName(s)
-            << " | daypart=" << WeatherVibeCore::DayPartName(dp) << "\n";
-
-        for (auto const& kv : lastApplied)
+        if (sorted.empty())
         {
-            LastApplied const& la = kv.second;
-            oss << "zone " << kv.first
-                << " -> state=" << WeatherVibeCore::WeatherStateName(la.state)
-                << " raw=" << std::fixed << std::setprecision(2) << la.grade
-                << "\n";
+            Reply(handler, "No profiles are loaded.");
+            return true;
         }
 
-        handler->SendSysMessage(oss.str().c_str());
+        std::sort(sorted.begin(), sorted.end(), [](Profile const* a, Profile const* b) { return a->name < b->name; });
+
+        for (Profile const* profile : sorted)
+            handler->SendSysMessage(sWeatherVibeEngine.Describe(*profile));
+
         return true;
     }
 
@@ -153,19 +172,229 @@ public:
     // ----------------------------------------------------------
     static bool HandleWvibeWhere(ChatHandler* handler)
     {
-        if (!HasWvibePermission(handler))
+        if (!MayRead(handler))
             return false;
 
         Player* player = handler->GetPlayer();
         if (!player)
+            return Fail(handler, "No player found (use in-game only).");
+
+        uint32 const zoneId = player->GetZoneId();
+        uint32 const areaId = player->GetAreaId();
+
+        Reply(handler, Acore::StringFormat("zone {} ({}) | area {} ({})",
+            zoneId, WeatherVibeCore::AreaName(zoneId), areaId, WeatherVibeCore::AreaName(areaId)));
+
+        Profile const* profile = sWeatherVibeEngine.Resolve(zoneId, areaId);
+        if (!profile)
         {
-            handler->SendSysMessage("|cff00ff00WeatherVibe:|r No player found (use in-game only).");
-            return false;
+            handler->SendSysMessage("  no weather profile here");
+            return true;
         }
 
-        std::ostringstream oss;
-        oss << "|cff00ff00WeatherVibe:|r where | zoneId=" << player->GetZoneId();
-        handler->SendSysMessage(oss.str().c_str());
+        bool const byArea = std::find(profile->areaIds.begin(), profile->areaIds.end(), areaId) != profile->areaIds.end();
+        handler->SendSysMessage(Acore::StringFormat("  profile {} (by {})", profile->name, byArea ? "area" : "zone"));
+        handler->SendSysMessage("  " + sWeatherVibeEngine.Describe(*profile));
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe set <zoneId> <state> <percentage:0..100>
+    // Sends the zone's profile there, then lets it carry on.
+    // ----------------------------------------------------------
+    static bool HandleWvibeSet(ChatHandler* handler, uint32 zoneId, std::string stateToken, float percentage)
+    {
+        if (!Ready(handler))
+            return false;
+
+        WeatherState state = WEATHER_STATE_FINE;
+        if (!StateArg(handler, stateToken, state))
+            return false;
+
+        if (Profile* profile = sWeatherVibeEngine.FindProfileFor(zoneId, 0))
+        {
+            sWeatherVibeEngine.Steer(*profile, state, percentage);
+            Reply(handler, "steering " + sWeatherVibeEngine.Describe(*profile));
+            return true;
+        }
+
+        float const raw = sWeatherVibeCore.PercentToRaw(sWeatherVibeCore.GetCurrentDayPart(), state, percentage);
+        uint32 const reached = sWeatherVibeEngine.PushToZone(zoneId, state, raw);
+        Reply(handler, Acore::StringFormat("zone {} has no profile; sent once to {} client(s), nothing will hold it.", zoneId, reached));
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe setRaw <zoneId> <state> <raw:0..1>
+    // Calibration: snaps to a raw grade and stays there until released.
+    // ----------------------------------------------------------
+    static bool HandleWvibeSetRaw(ChatHandler* handler, uint32 zoneId, std::string stateToken, float rawGrade)
+    {
+        if (!Ready(handler))
+            return false;
+
+        WeatherState state = WEATHER_STATE_FINE;
+        if (!StateArg(handler, stateToken, state))
+            return false;
+
+        if (Profile* profile = sWeatherVibeEngine.FindProfileFor(zoneId, 0))
+        {
+            sWeatherVibeEngine.ForceRaw(*profile, state, rawGrade);
+            Reply(handler, sWeatherVibeEngine.Describe(*profile));
+            return true;
+        }
+
+        uint32 const reached = sWeatherVibeEngine.PushToZone(zoneId, state, rawGrade);
+        Reply(handler, Acore::StringFormat("zone {} has no profile; sent once to {} client(s), nothing will hold it.", zoneId, reached));
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe force <here|profile> <state> <percentage> [minutes]
+    // ----------------------------------------------------------
+    static bool HandleWvibeForce(ChatHandler* handler, std::string target, std::string stateToken, float percentage, Optional<uint32> minutes)
+    {
+        if (!Ready(handler))
+            return false;
+
+        Profile* profile = ProfileArg(handler, target);
+        if (!profile)
+            return false;
+
+        WeatherState state = WEATHER_STATE_FINE;
+        if (!StateArg(handler, stateToken, state))
+            return false;
+
+        sWeatherVibeEngine.Force(*profile, state, percentage, std::min(minutes.value_or(0), 24u * 60u));
+        Reply(handler, sWeatherVibeEngine.Describe(*profile));
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe resume [here|profile|all]
+    // ----------------------------------------------------------
+    static bool HandleWvibeResume(ChatHandler* handler, Optional<std::string> target)
+    {
+        if (!Ready(handler))
+            return false;
+
+        if (!target || ToLower(*target) == "all")
+        {
+            uint32 released = 0;
+            for (Profile const& profile : sWeatherVibeEngine.GetProfiles())
+            {
+                if (!profile.live.forced)
+                    continue;
+
+                sWeatherVibeEngine.Resume(*sWeatherVibeEngine.FindProfile(profile.name));
+                ++released;
+            }
+
+            Reply(handler, Acore::StringFormat("released {} locked profile(s).", released));
+            return true;
+        }
+
+        Profile* profile = ProfileArg(handler, *target);
+        if (!profile)
+            return false;
+
+        sWeatherVibeEngine.Resume(*profile);
+        Reply(handler, profile->name + " released.");
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe next [here|profile]
+    // ----------------------------------------------------------
+    static bool HandleWvibeNext(ChatHandler* handler, Optional<std::string> target)
+    {
+        if (!Ready(handler))
+            return false;
+
+        Profile* profile = ProfileArg(handler, target.value_or("here"));
+        if (!profile)
+            return false;
+
+        sWeatherVibeEngine.SkipHold(*profile);
+        Reply(handler, profile->name + " will pick its next weather now.");
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe reload
+    // Re-reads the config files and re-applies this module only. `.reload config` works too.
+    // ----------------------------------------------------------
+    static bool HandleWvibeReload(ChatHandler* handler)
+    {
+        if (!sConfigMgr->Reload())
+            return Fail(handler, "Could not re-read the config files.");
+
+        WeatherVibe_ApplyConfig(true);
+
+        if (!sWeatherVibeCore.IsEnabled())
+        {
+            Reply(handler, "config re-read; the module is disabled.");
+            return true;
+        }
+
+        Reply(handler, Acore::StringFormat("config re-read: {} profile(s); running weather was kept. Warnings, if any, are in the server log.",
+            sWeatherVibeEngine.GetProfiles().size()));
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe debug <on|off>
+    // ----------------------------------------------------------
+    static bool HandleWvibeDebug(ChatHandler* handler, std::string onOff)
+    {
+        Player* player = handler->GetPlayer();
+        if (!player)
+            return Fail(handler, "In-game only. For the server log, set WeatherVibe.Debug = 1.");
+
+        std::string const mode = ToLower(onOff);
+        if (mode != "on" && mode != "off")
+            return Fail(handler, "Use .wvibe debug on or .wvibe debug off.");
+
+        sWeatherVibeCore.SetDebugSubscriber(player->GetGUID(), mode == "on");
+        Reply(handler, mode == "on"
+            ? "you will see the engine's decisions for the weather you stand in."
+            : "debug feed off.");
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe simulate <here|profile> [hours]
+    // ----------------------------------------------------------
+    static bool HandleWvibeSimulate(ChatHandler* handler, std::string target, Optional<uint32> hours)
+    {
+        if (!Ready(handler))
+            return false;
+
+        Profile* profile = ProfileArg(handler, target);
+        if (!profile)
+            return false;
+
+        uint32 const span = std::clamp(hours.value_or(48), 1u, 2000u);
+        std::array<float, WV_STATES> const share = sWeatherVibeEngine.Simulate(*profile, span);
+
+        Reply(handler, Acore::StringFormat("{} over {}h as things stand now ({}, {}):", profile->name, span,
+            WeatherVibeCore::SeasonName(sWeatherVibeCore.GetCurrentSeason()),
+            WeatherVibeCore::DayPartName(sWeatherVibeCore.GetCurrentDayPart())));
+
+        std::vector<size_t> order;
+        for (size_t i = 0; i < WV_STATES; ++i)
+            if (share[i] > 0.0005f)
+                order.push_back(i);
+
+        std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return share[a] > share[b]; });
+
+        for (size_t index : order)
+            handler->SendSysMessage(Acore::StringFormat("  {:5.1f}%  {}", share[index] * 100.0f,
+                WeatherVibeCore::WeatherStateName(WeatherVibeCore::StateAt(index))));
+
+        if (order.empty())
+            handler->SendSysMessage("  nothing to pick from in this season.");
+
         return true;
     }
 
@@ -174,35 +403,44 @@ public:
     // ----------------------------------------------------------
     static bool HandleWvibeHelp(ChatHandler* handler)
     {
-        if (!HasWvibePermission(handler))
+        if (!MayRead(handler))
             return false;
 
-        handler->SendSysMessage("|cff00ff00WeatherVibe:|r commands:");
-        handler->SendSysMessage("  .wvibe set [zoneId] [state] [pct:0..100]");
-        handler->SendSysMessage("  .wvibe setRaw [zoneId] [state] [raw:0..1]");
-        handler->SendSysMessage("  .wvibe where (shows current zoneId)");
-        handler->SendSysMessage("  .wvibe show (weather per zone overview)");
-        handler->SendSysMessage("|cff00ff00WeatherVibe:|r States:");
+        Reply(handler, "commands:");
+        handler->SendSysMessage("  .wvibe status [here|profile]  (current weather, time to next change)");
+        handler->SendSysMessage("  .wvibe where  (zone and area ids, and the profile that covers them)");
+        handler->SendSysMessage("  .wvibe set [zoneId] [state] [pct:0..100]  (go there, then carry on)");
+        handler->SendSysMessage("  .wvibe force [here|profile] [state] [pct] [minutes]  (go there and stay)");
+        handler->SendSysMessage("  .wvibe setRaw [zoneId] [state] [raw:0..1]  (calibration: snap and stay)");
+        handler->SendSysMessage("  .wvibe resume [here|profile|all]  |  .wvibe next [here|profile]");
+        handler->SendSysMessage("  .wvibe simulate [here|profile] [hours]  |  .wvibe debug on|off  |  .wvibe reload");
+        Reply(handler, "states (number or name):");
         handler->SendSysMessage("0 Fine | 1 Fog | 3 LightRain | 4 MediumRain | 5 HeavyRain");
         handler->SendSysMessage("6 LightSnow | 7 MediumSnow | 8 HeavySnow");
-        handler->SendSysMessage("22 LightSand | 41 MediumSand | 42 HeavySand | 86 Thunder");
+        handler->SendSysMessage("22 LightSandstorm | 41 MediumSandstorm | 42 HeavySandstorm | 86 Thunders");
         return true;
     }
 
     // ----------------------------------------------------------
-    // Command table – registered at SEC_PLAYER so everyone can
-    // attempt the command; actual permission is checked at
-    // runtime via HasWvibePermission() in each handler.
+    // Command table – the read-only commands are registered at SEC_PLAYER and gated at runtime
+    // by MayRead(); everything that changes the weather is GM-only here.
     // ----------------------------------------------------------
     ChatCommandTable GetCommands() const override
     {
         static ChatCommandTable wvibeTable =
         {
-            { "set",    HandleWvibeSet,    SEC_PLAYER, Console::Yes },
-            { "setRaw", HandleWvibeSetRaw, SEC_PLAYER, Console::Yes },
-            { "show",   HandleWvibeShow,   SEC_PLAYER, Console::Yes },
-            { "where",  HandleWvibeWhere,  SEC_PLAYER, Console::Yes },
-            { "help",   HandleWvibeHelp,   SEC_PLAYER, Console::Yes },
+            { "status",   HandleWvibeStatus,   SEC_PLAYER,        Console::Yes },
+            { "show",     HandleWvibeStatus,   SEC_PLAYER,        Console::Yes },
+            { "where",    HandleWvibeWhere,    SEC_PLAYER,        Console::No  },
+            { "help",     HandleWvibeHelp,     SEC_PLAYER,        Console::Yes },
+            { "set",      HandleWvibeSet,      SEC_GAMEMASTER,    Console::Yes },
+            { "setRaw",   HandleWvibeSetRaw,   SEC_GAMEMASTER,    Console::Yes },
+            { "force",    HandleWvibeForce,    SEC_GAMEMASTER,    Console::Yes },
+            { "resume",   HandleWvibeResume,   SEC_GAMEMASTER,    Console::Yes },
+            { "next",     HandleWvibeNext,     SEC_GAMEMASTER,    Console::Yes },
+            { "simulate", HandleWvibeSimulate, SEC_GAMEMASTER,    Console::Yes },
+            { "debug",    HandleWvibeDebug,    SEC_GAMEMASTER,    Console::No  },
+            { "reload",   HandleWvibeReload,   SEC_ADMINISTRATOR, Console::Yes },
         };
         static ChatCommandTable root =
         {
