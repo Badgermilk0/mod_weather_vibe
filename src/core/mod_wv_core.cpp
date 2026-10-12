@@ -1,6 +1,8 @@
 #include "mod_wv_core.h"
+#include "mod_wv_pick.h"
 
 #include "Config.h"
+#include "DataMap.h"
 #include "DBCStores.h"
 #include "GameTime.h"
 #include "Log.h"
@@ -13,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <ctime>
 
@@ -30,19 +33,40 @@ namespace
 
     constexpr std::array<StateInfo, WV_STATES> kStates =
     { {
-        { WEATHER_STATE_FINE,             "Fine",            { 0.00f, 0.30f } },
-        { WEATHER_STATE_FOG,              "Fog",             { 0.15f, 0.30f } },
-        { WEATHER_STATE_LIGHT_RAIN,       "LightRain",       { 0.25f, 0.60f } },
-        { WEATHER_STATE_MEDIUM_RAIN,      "MediumRain",      { 0.25f, 0.70f } },
-        { WEATHER_STATE_HEAVY_RAIN,       "HeavyRain",       { 0.25f, 0.90f } },
-        { WEATHER_STATE_LIGHT_SNOW,       "LightSnow",       { 0.25f, 0.60f } },
-        { WEATHER_STATE_MEDIUM_SNOW,      "MediumSnow",      { 0.25f, 0.70f } },
-        { WEATHER_STATE_HEAVY_SNOW,       "HeavySnow",       { 0.25f, 0.90f } },
-        { WEATHER_STATE_LIGHT_SANDSTORM,  "LightSandstorm",  { 0.25f, 0.60f } },
-        { WEATHER_STATE_MEDIUM_SANDSTORM, "MediumSandstorm", { 0.25f, 0.70f } },
-        { WEATHER_STATE_HEAVY_SANDSTORM,  "HeavySandstorm",  { 0.25f, 0.90f } },
-        { WEATHER_STATE_THUNDERS,         "Thunders",        { 0.15f, 0.40f } }
+        // Sky only: the client's sky is fully stormy at grade 0.25 and nothing above that
+        // changes it, so these bands live inside 0..0.25. Fine tops out at half the storm sky.
+        { WEATHER_STATE_FINE,             "Fine",            { 0.00f, 0.125f } },
+        { WEATHER_STATE_FOG,              "Fog",             { 0.10f, 0.25f } },
+        // Precipitation: nothing falls at or below 0.25, so every band starts above it, and
+        // the tiers climb with a little overlap so that heavy is always heavier than medium.
+        { WEATHER_STATE_LIGHT_RAIN,       "LightRain",       { 0.30f, 0.50f } },
+        { WEATHER_STATE_MEDIUM_RAIN,      "MediumRain",      { 0.45f, 0.70f } },
+        { WEATHER_STATE_HEAVY_RAIN,       "HeavyRain",       { 0.62f, 0.95f } },
+        { WEATHER_STATE_LIGHT_SNOW,       "LightSnow",       { 0.32f, 0.52f } },   // snow is sparse:
+        { WEATHER_STATE_MEDIUM_SNOW,      "MediumSnow",      { 0.48f, 0.74f } },   // a fifth of rain's
+        { WEATHER_STATE_HEAVY_SNOW,       "HeavySnow",       { 0.66f, 1.00f } },   // particle count
+        { WEATHER_STATE_LIGHT_SANDSTORM,  "LightSandstorm",  { 0.30f, 0.50f } },
+        { WEATHER_STATE_MEDIUM_SANDSTORM, "MediumSandstorm", { 0.45f, 0.70f } },
+        { WEATHER_STATE_HEAVY_SANDSTORM,  "HeavySandstorm",  { 0.62f, 0.95f } },
+        { WEATHER_STATE_THUNDERS,         "Thunders",        { 0.60f, 0.95f } },   // a downpour
+        { WV_STATE_THUNDER_SNOW,          "ThunderSnow",     { 0.66f, 1.00f } },
+        { WV_STATE_DRY_THUNDERS,          "DryThunders",     { 0.20f, 0.25f } }    // how dark the sky gets
     } };
+
+    // The last thing a client was told, kept on the player (see WeatherVibeCore::Deliver).
+    struct SentWeather : public DataMap::Base
+    {
+        WeatherState wireId = WEATHER_STATE_FINE;
+        float        grade = 0.0f;
+    };
+
+    char const* const SENT_KEY = "WeatherVibe.Sent";
+
+    // Weather.dbc rows the core has no name for.
+    constexpr WeatherState CLIENT_WEATHER_DARK_RAIN = WeatherState(90);    // rain motion, leaf-brown streaks, no sound
+    constexpr WeatherState CLIENT_WEATHER_RED_RAIN = WeatherState(100);    // rain motion, red drops
+    constexpr WeatherState CLIENT_WEATHER_EMBER = WeatherState(103);       // sandstorm motion, orange
+    constexpr WeatherState CLIENT_WEATHER_ASH = WeatherState(104);         // sandstorm motion, black mist, no sound
 }
 
 // ============================================================
@@ -213,8 +237,15 @@ void WeatherVibeCore::LoadConfig(WeatherVibe::ConfigView const& cfg)
         return;
     }
 
-    if (sWorld->getBoolConfig(CONFIG_WEATHER))
+    m_coreWeatherOn = sWorld->getBoolConfig(CONFIG_WEATHER);
+    if (m_coreWeatherOn)
         LOG_ERROR("module", "WeatherVibe: ActivateWeather is enabled in worldserver.conf, but WeatherVibe is also enabled. This will cause conflicts. Please set ActivateWeather = 0 to let WeatherVibe control weather.");
+
+    // Which sound loop goes with how much is falling. The first is also the grade below
+    // which precipitation is sent as plain sky: too thin to see, so it must not be heard.
+    m_loopLightFrom = std::clamp(cfg.Float("WeatherVibe.Sound.From.Light", 0.29f), WeatherVibe::CLIENT_PARTICLE_FLOOR, 1.0f);
+    m_loopMediumFrom = std::clamp(cfg.Float("WeatherVibe.Sound.From.Medium", 0.50f), m_loopLightFrom, 1.0f);
+    m_loopHeavyFrom = std::clamp(cfg.Float("WeatherVibe.Sound.From.Heavy", 0.68f), m_loopMediumFrom, 1.0f);
 
     LoadDayPartConfig(cfg);
     LoadIntensityRangesConfig(cfg);
@@ -280,6 +311,18 @@ void WeatherVibeCore::LoadIntensityRangesConfig(WeatherVibe::ConfigView const& c
             }
 
             m_stateRanges[dp][i] = range;
+
+            // The client's two thresholds make some of a band pointless; say so once per state.
+            if (dp != 0)
+                continue;
+
+            bool const skyOnly = WeatherVibe::GroundOf(kStates[i].state) == WeatherVibe::Ground::SKY;
+            if (skyOnly && range.max > WeatherVibe::CLIENT_PARTICLE_FLOOR + 0.001f)
+                LOG_WARN("server.loading", "[WeatherVibe] {} is only a sky, and the sky is fully stormy at grade 0.25: "
+                    "the part of its range above 0.25 ({:.2f}) changes nothing", kStates[i].name, range.max);
+            else if (!skyOnly && range.min < m_loopLightFrom - 0.001f)
+                LOG_WARN("server.loading", "[WeatherVibe] {} starts at grade {:.2f}, but nothing falls at or below 0.25 and it is "
+                    "sent as plain sky below {:.2f}: its low percentages will show no weather", kStates[i].name, range.min, m_loopLightFrom);
         }
     }
 }
@@ -431,10 +474,52 @@ float WeatherVibeCore::RawToPercent(DayPart dp, WeatherState state, float rawGra
 // ============================================================
 // Delivery
 // ============================================================
-void WeatherVibeCore::SendWeather(Player* player, WeatherState state, float rawGrade)
+void WeatherVibeCore::SendWeather(Player* player, WeatherState wireId, float rawGrade)
 {
-    WorldPackets::Misc::Weather weather(state, ClampRaw(state, rawGrade));
+    WorldPackets::Misc::Weather weather(wireId, ClampRaw(wireId, rawGrade));
     player->SendDirectMessage(weather.Write());
+}
+
+bool WeatherVibeCore::Deliver(Player* player, WeatherState wireId, float rawGrade, WeatherVibe::Tell why)
+{
+    using WeatherVibe::Tell;
+
+    float const grade = ClampRaw(wireId, rawGrade);
+    SentWeather* sent = player->CustomData.Get<SentWeather>(SENT_KEY);
+
+    if (sent && sent->wireId == wireId)
+    {
+        float const off = std::fabs(sent->grade - grade);
+
+        if (RestartsOnPacket(wireId))
+        {
+            // Never said twice - and a player who only walked into much the same snow keeps
+            // the snow they have, rather than watch it fade out and come back a shade thicker.
+            if (off < (why == Tell::CHANGE ? WeatherVibe::GRADE_EPSILON : WeatherVibe::RESTART_NOT_WORTH))
+                return false;
+        }
+        else if (why != Tell::REPEAT && off < WeatherVibe::GRADE_EPSILON)
+            return false;   // the client is already showing exactly this
+    }
+
+    // A rain id with a texture of its own (the dark and red skins) leaves that texture on
+    // ordinary rain afterwards. Any packet that is not rain clears it, so send the sky first.
+    if (sent && (sent->wireId == CLIENT_WEATHER_DARK_RAIN || sent->wireId == CLIENT_WEATHER_RED_RAIN)
+        && wireId >= WEATHER_STATE_LIGHT_RAIN && wireId <= WEATHER_STATE_HEAVY_RAIN)
+        SendWeather(player, WEATHER_STATE_FINE, grade);
+
+    SendWeather(player, wireId, grade);
+
+    if (!sent)
+        sent = player->CustomData.GetDefault<SentWeather>(SENT_KEY);
+    sent->wireId = wireId;
+    sent->grade = grade;
+    return true;
+}
+
+void WeatherVibeCore::Forget(Player* player)
+{
+    player->CustomData.Erase(SENT_KEY);
 }
 
 bool WeatherVibeCore::HasClient(Player const* player)
@@ -443,12 +528,132 @@ bool WeatherVibeCore::HasClient(Player const* player)
     return session && !session->IsSocketClosed();
 }
 
+// Both sets are nearly always empty, and the logout hook calls the "off" side for every
+// character including bots: leave an empty set untouched.
 void WeatherVibeCore::SetDebugSubscriber(ObjectGuid guid, bool on)
 {
     if (on)
         m_debugSubscribers.insert(guid);
-    else
+    else if (!m_debugSubscribers.empty())
         m_debugSubscribers.erase(guid);
+}
+
+void WeatherVibeCore::SetAuditioning(ObjectGuid guid, bool on)
+{
+    if (on)
+        m_auditioning.insert(guid);
+    else if (!m_auditioning.empty())
+        m_auditioning.erase(guid);
+}
+
+// ============================================================
+// Module state -> client weather id
+// ============================================================
+bool WeatherVibeCore::IsThunder(WeatherState s)
+{
+    return s == WEATHER_STATE_THUNDERS || s == WV_STATE_THUNDER_SNOW || s == WV_STATE_DRY_THUNDERS;
+}
+
+WeatherState WeatherVibeCore::WireState(WeatherState state, WeatherSkins skins, float rawGrade) const
+{
+    using WeatherVibe::Ground;
+
+    Ground const ground = WeatherVibe::GroundOf(state);
+
+    // A sky is a sky. Fine has no row in the client's table and Fog has one with no particles
+    // and no sound: to the client they are the same thing, a sky dimmed by the grade.
+    if (ground == Ground::SKY)
+        return state == WEATHER_STATE_FINE ? WEATHER_STATE_FINE : WEATHER_STATE_FOG;
+
+    // Too little is falling to see. The id would still switch its sound loop on at once, so
+    // send the sky alone: it looks the same, and it is quiet.
+    if (rawGrade < m_loopLightFrom)
+        return WEATHER_STATE_FINE;
+
+    // From here the id is chosen for its sound, by how much is falling: a state's name does
+    // not decide the loop, the grade does. 0 light, 1 medium, 2 heavy.
+    int const loop = rawGrade >= m_loopHeavyFrom ? 2 : (rawGrade >= m_loopMediumFrom ? 1 : 0);
+
+    switch (ground)
+    {
+    case Ground::RAIN:
+        if (skins.rain == RainSkin::DARK) return CLIENT_WEATHER_DARK_RAIN;
+        if (skins.rain == RainSkin::RED)  return CLIENT_WEATHER_RED_RAIN;
+        return loop == 2 ? WEATHER_STATE_HEAVY_RAIN : (loop == 1 ? WEATHER_STATE_MEDIUM_RAIN : WEATHER_STATE_LIGHT_RAIN);
+
+    case Ground::SNOW:
+        return loop == 2 ? WEATHER_STATE_HEAVY_SNOW : (loop == 1 ? WEATHER_STATE_MEDIUM_SNOW : WEATHER_STATE_LIGHT_SNOW);
+
+    case Ground::SAND:
+    default:
+        if (skins.sand == SandSkin::ASH)   return CLIENT_WEATHER_ASH;
+        if (skins.sand == SandSkin::EMBER) return CLIENT_WEATHER_EMBER;
+
+        // The client's table has the sandstorm loops crossed against the core's names:
+        // id 22 carries the heavy wind, 41 the light one, 42 the medium one.
+        return loop == 2 ? WEATHER_STATE_LIGHT_SANDSTORM : (loop == 1 ? WEATHER_STATE_HEAVY_SANDSTORM : WEATHER_STATE_MEDIUM_SANDSTORM);
+    }
+}
+
+WeatherState WeatherVibeCore::HookState(WeatherState state)
+{
+    return IsThunder(state) ? WEATHER_STATE_THUNDERS : state;
+}
+
+bool WeatherVibeCore::RestartsOnPacket(WeatherState wireId)
+{
+    switch (wireId)
+    {
+    case WEATHER_STATE_LIGHT_SNOW:
+    case WEATHER_STATE_MEDIUM_SNOW:
+    case WEATHER_STATE_HEAVY_SNOW:
+    case WEATHER_STATE_LIGHT_SANDSTORM:
+    case WEATHER_STATE_MEDIUM_SANDSTORM:
+    case WEATHER_STATE_HEAVY_SANDSTORM:
+    case CLIENT_WEATHER_ASH:
+    case CLIENT_WEATHER_EMBER:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool WeatherVibeCore::ParseRainSkin(std::string const& token, RainSkin& out)
+{
+    std::string const t = WeatherVibe::ToLower(WeatherVibe::Trim(token));
+    if (t == "rain") { out = RainSkin::RAIN; return true; }
+    if (t == "dark") { out = RainSkin::DARK; return true; }
+    if (t == "red")  { out = RainSkin::RED;  return true; }
+    return false;
+}
+
+bool WeatherVibeCore::ParseSandSkin(std::string const& token, SandSkin& out)
+{
+    std::string const t = WeatherVibe::ToLower(WeatherVibe::Trim(token));
+    if (t == "sand")  { out = SandSkin::SAND;  return true; }
+    if (t == "ash")   { out = SandSkin::ASH;   return true; }
+    if (t == "ember") { out = SandSkin::EMBER; return true; }
+    return false;
+}
+
+char const* WeatherVibeCore::RainSkinName(RainSkin skin)
+{
+    switch (skin)
+    {
+    case RainSkin::DARK: return "dark";
+    case RainSkin::RED:  return "red";
+    default:             return "rain";
+    }
+}
+
+char const* WeatherVibeCore::SandSkinName(SandSkin skin)
+{
+    switch (skin)
+    {
+    case SandSkin::ASH:   return "ash";
+    case SandSkin::EMBER: return "ember";
+    default:              return "sand";
+    }
 }
 
 // ============================================================

@@ -16,11 +16,13 @@
 #     .wvibe where                                      zone/area ids and the profile covering them
 #     .wvibe set <zoneId> <state> <percentage:0..100>   go there, then carry on
 #     .wvibe force <here|profile> <state> <pct> [min]   go there and stay
-#     .wvibe setRaw <zoneId> <state> <raw:0..1>         calibration: snap and stay
+#     .wvibe setRaw <zoneId> <state> <grade:0..1>       calibration: snap to a client grade and stay
 #     .wvibe resume | next | simulate | debug | reload
+#     .wvibe audition <clientWeatherId> [grade] | off   look at any client weather, you only
+#     .wvibe lightning                                  drop one lightning bolt beside you
 #   <state> is a number or a name: 0 Fine, 1 Fog, 3 LightRain, 4 MediumRain, 5 HeavyRain,
 #   6 LightSnow, 7 MediumSnow, 8 HeavySnow, 22 LightSandstorm, 41 MediumSandstorm,
-#   42 HeavySandstorm, 86 Thunders.
+#   42 HeavySandstorm, 86 Thunders (also ThunderSnow, DryThunders).
 #######################################################################################################
 #######################################################################################################
 
@@ -54,8 +56,11 @@ WeatherVibeCommand = 0
 WeatherVibe.Profile.Enable = 1
 
 # Legacy safety net: re-send the current weather to everyone every N seconds.
-# No longer needed - a client is told the weather when it logs in, changes
-# zone or area, and whenever the weather moves. 0 = off.
+# Not needed - a client is told the weather when it logs in, changes zone or
+# area, and whenever the weather moves, and every 20 seconds the module checks
+# that each client was last told what it should be showing. Switched on, this
+# repeats rain and skies only: the client restarts snow and sandstorm from
+# nothing on every packet about them, so those are never said twice. 0 = off.
 # ----------------------------------------------------------------------
 WeatherVibe.Profile.ReApply.PerSec = 0
 
@@ -87,9 +92,16 @@ WeatherVibe.Hold.MediumSandstorm = 1.00
 WeatherVibe.Hold.HeavySandstorm  = 0.75
 WeatherVibe.Hold.Thunders        = 0.60
 
-# While weather is changing, the intensity is nudged this often (seconds) in
-# small eased steps. How long a whole change takes still comes from each
-# profile's Transition.Step.* and StepSize.Perc.
+# While rain or the sky is changing, the grade is nudged this often (seconds)
+# in small eased steps. How long such a change takes comes from each profile's
+# Transition.Step.* and StepSize.Perc: one step of time per StepSize.Perc of
+# the sky's range (grade 0 - 0.25) or the rain's (0.25 - 1) that is crossed.
+#
+# Snow and sandstorm are not nudged. The client fades them out and starts them
+# over on every packet about them, so they are sent once, with the grade they
+# are going to, and the client does the fading (about 10 seconds for the whole
+# range). For the same reason a profile that picks the same snow again leaves
+# it exactly as it is.
 # ----------------------------------------------------------------------
 WeatherVibe.Transition.TickSeconds = 4
 
@@ -121,6 +133,75 @@ WeatherVibe.FogBridge.Boost = 1.5
 # 0 = off.
 # ----------------------------------------------------------------------
 WeatherVibe.Front.Strength = 1.5
+
+
+#######################################################################################################
+#######################################################################################################
+# Thunder, lightning and looks
+#######################################################################################################
+
+# Thunder. The game client has no thunderstorm of its own: the weather the core
+# calls "Thunders" (86) is rain with the Dark Portal's ambience loop. So a
+# storm here is drawn as rain, snow or the darkest sky - whichever suits the
+# profile, as hard as its grade says - and the server plays the thunderclaps. Everyone in the
+# same weather hears the same clap. The gap between claps is random between
+# Min and Max seconds, nearer Min as the storm builds.
+# ----------------------------------------------------------------------
+WeatherVibe.Thunder.Enable = 1
+WeatherVibe.Thunder.IntervalSeconds.Min = 12
+WeatherVibe.Thunder.IntervalSeconds.Max = 70
+
+# The claps: sound ids (SoundEntries.dbc) whose files ship with every 3.3.5a
+# client. "Near" are loud and are picked more often the harder the storm;
+# "Far" are quiet. A sound entry with several files plays a random one.
+#   4936   Blasted Lands lightning bolt   (3 variants, loudest)
+#   13021  Storm Peaks lightning          (3 variants)
+#   9843   Netherstorm lightning crack    (7 variants, quieter)
+#   10007  the same cracks, quieter still
+# Audition any of them in game with  .debug play sound <id>
+# ----------------------------------------------------------------------
+WeatherVibe.Thunder.Sounds.Near = 4936, 13021
+WeatherVibe.Thunder.Sounds.Far  = 9843, 10007
+
+# Lightning strikes. With a clap, a bolt may land near a player: a short-lived
+# native game object (no SQL needed) with its own thunder that fades with
+# distance. Outdoors only, never on water. Off until you have looked at one:
+#   .wvibe lightning      drops a bolt beside you, whether this is on or not
+# Chance is per player per clap; players standing together share a bolt.
+# Other stock objects with the same bolt: 183356 (half size), 180252.
+# ----------------------------------------------------------------------
+WeatherVibe.Lightning.Enable = 0
+WeatherVibe.Lightning.GameObject = 190569
+WeatherVibe.Lightning.Chance = 35
+WeatherVibe.Lightning.DespawnSeconds = 3
+WeatherVibe.Lightning.Distance.Min = 35
+WeatherVibe.Lightning.Distance.Max = 90
+
+# Looks. The client can draw a few kinds of weather the profiles do not use
+# yet. A profile can say what its sandstorm or its rain IS; its rows, weights
+# and pacing stay exactly as they are, only what the client draws changes.
+#   WeatherVibe.Profile.<Name>.Sandstorm.Skin = sand | ash | ember
+#        ash    black mist on the wind, silent   (client weather 104)
+#        ember  orange dust                      (client weather 103)
+#   WeatherVibe.Profile.<Name>.Rain.Skin = rain | dark | red
+#        dark   dark streaks, silent             (client weather 90)
+#        red    red drops                        (client weather 100)
+# None is switched on. How they look was read from the client's data tables,
+# not seen - look first, to you alone and without touching the zone:
+#   .wvibe audition 104 0.6        (then 103, 90, 100; second number is the grade)
+#   .wvibe audition off
+# The three volcanic profiles say in their own descriptions that their
+# sandstorm stands for ash and cinder. Change "sand" to "ash" once you like it.
+# (To give another profile a skin, add its line here in the .conf.dist too.)
+# ----------------------------------------------------------------------
+WeatherVibe.Profile.BlackrockMountain.Sandstorm.Skin = sand
+WeatherVibe.Profile.BurningSteppes.Sandstorm.Skin = sand
+WeatherVibe.Profile.SearingGorge.Sandstorm.Skin = sand
+
+# Profiles with thunder of their own.
+# ----------------------------------------------------------------------
+WeatherVibe.Profile.Netherstorm.Thunder.Sounds = 9843, 10007
+WeatherVibe.Profile.EyeOfTheStorm.Thunder.Sounds = 9843, 10007
 
 
 #######################################################################################################
@@ -222,97 +303,155 @@ WeatherVibe.Remarks.Clear.4 = Fine weather again. Make the most of it.
 
 #######################################################################################################
 #######################################################################################################
-# Internal intensity ranges - raw grade band per daypart/state (core)
+# What the client does with weather, and the grade bands that follow from it (core)
 #
-# A profile entry's percentage (0..100) is how far into this band the weather is.
-# Fine runs the other way round: 100% is a clear sky (the band's minimum) and 0%
-# is as overcast as "fine" gets (the band's maximum) - which is where
-# precipitation takes over, so Fine's maximum should sit near rain's minimum.
+# A weather packet is an id and a grade from 0 to 1. The 3.3.5a client uses the
+# two like this (read from its own code; DESIGN.md has the details):
+#
+#   the id      picks the sound loop - at once, whatever the grade.
+#   the grade   decides how much falls:  density = (grade - 0.25) / 0.75.
+#               Nothing falls at or below 0.25, whatever the id.
+#   the sky     darkens over the first quarter of the grade only: clear at 0,
+#               fully stormy at 0.25, and no darker after that.
+#
+# So the grade has two parts. 0.00 - 0.25 is the sky clouding over with nothing
+# falling; 0.25 - 1.00 is how much falls, under a sky that is already stormy.
+#
+# A profile entry's percentage (0..100) is how far into its state's band the
+# weather is. Fine runs the other way round: 100% is a clear sky (the band's
+# minimum) and 0% is as clouded as "fine" gets (the band's maximum).
+#
+#   Fine, Fog, DryThunders   are skies. Keep them inside 0.00 - 0.25: anything
+#                            above 0.25 changes nothing on screen.
+#   rain, snow, sandstorm    start above 0.25, or their low percentages show no
+#                            weather at all.
+#
+# Format:  <min>, <max>   - per daypart, should you want nights heavier than days.
+# The server log warns about a band the client cannot show.
+#
+# NOTE if you keep a mod_weather_vibe.conf of your own: it still has the old
+# bands (rain from 0.25, Fine up to 0.30), and those are what produced rain
+# that could be heard and not seen, and "fine" days under a storm sky. Copy
+# this whole section over them.
 #######################################################################################################
 
-# Fine (0)
+# Which sound goes with how much is falling. The module picks the id for its
+# sound by the grade, not by the state's name, so thin "heavy rain" never roars
+# and a thick "light rain" is not a whisper.
+#   below Light    too little falls to see: sent as plain sky, which looks the
+#                  same and is silent
+#   from Light     the light loop      (rain 3, snow 6, sandstorm 41)
+#   from Medium    the medium loop     (rain 4, snow 7, sandstorm 42)
+#   from Heavy     the heavy loop      (rain 5, snow 8, sandstorm 22)
+# (The client's table has the sandstorm loops shuffled: 22 is its strongest wind.)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.Fine          = 0.00, 0.30
-WeatherVibe.Intensity.InternalRange.AFTERNOON.Fine        = 0.00, 0.30
-WeatherVibe.Intensity.InternalRange.EVENING.Fine          = 0.00, 0.30
-WeatherVibe.Intensity.InternalRange.NIGHT.Fine            = 0.00, 0.30
+WeatherVibe.Sound.From.Light  = 0.29
+WeatherVibe.Sound.From.Medium = 0.50
+WeatherVibe.Sound.From.Heavy  = 0.68
 
-# Fog (1)
+# Fine (0)  -  a sky and nothing else
+# 0.125 is half of the storm sky, so a fine day is never worse than lightly
+# clouded. Raise the maximum towards 0.25 for gloomier fine days everywhere.
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.Fog           = 0.15, 0.30
-WeatherVibe.Intensity.InternalRange.AFTERNOON.Fog         = 0.15, 0.30
-WeatherVibe.Intensity.InternalRange.EVENING.Fog           = 0.15, 0.30
-WeatherVibe.Intensity.InternalRange.NIGHT.Fog             = 0.15, 0.30
+WeatherVibe.Intensity.InternalRange.MORNING.Fine              = 0.00, 0.125
+WeatherVibe.Intensity.InternalRange.AFTERNOON.Fine            = 0.00, 0.125
+WeatherVibe.Intensity.InternalRange.EVENING.Fine              = 0.00, 0.125
+WeatherVibe.Intensity.InternalRange.NIGHT.Fine                = 0.00, 0.125
 
-# Light Rain (3)
+# Fog (1)  -  to the client, a heavier sky than Fine: grey and close, nothing
+# falling. (It has no ground fog to offer through weather.)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.LightRain     = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.AFTERNOON.LightRain   = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.EVENING.LightRain     = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.NIGHT.LightRain       = 0.25, 0.60
+WeatherVibe.Intensity.InternalRange.MORNING.Fog               = 0.10, 0.25
+WeatherVibe.Intensity.InternalRange.AFTERNOON.Fog             = 0.10, 0.25
+WeatherVibe.Intensity.InternalRange.EVENING.Fog               = 0.10, 0.25
+WeatherVibe.Intensity.InternalRange.NIGHT.Fog                 = 0.10, 0.25
 
-# Medium Rain (4)
+# Light Rain (3)  -  7% to 33% of full density
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.MediumRain    = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.AFTERNOON.MediumRain  = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.EVENING.MediumRain    = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.NIGHT.MediumRain      = 0.25, 0.80
+WeatherVibe.Intensity.InternalRange.MORNING.LightRain         = 0.30, 0.50
+WeatherVibe.Intensity.InternalRange.AFTERNOON.LightRain       = 0.30, 0.50
+WeatherVibe.Intensity.InternalRange.EVENING.LightRain         = 0.30, 0.50
+WeatherVibe.Intensity.InternalRange.NIGHT.LightRain           = 0.30, 0.50
 
-# Heavy Rain (5)
+# Medium Rain (4)  -  27% to 60%
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.HeavyRain     = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.AFTERNOON.HeavyRain   = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.EVENING.HeavyRain     = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.NIGHT.HeavyRain       = 0.25, 0.90
+WeatherVibe.Intensity.InternalRange.MORNING.MediumRain        = 0.45, 0.70
+WeatherVibe.Intensity.InternalRange.AFTERNOON.MediumRain      = 0.45, 0.70
+WeatherVibe.Intensity.InternalRange.EVENING.MediumRain        = 0.45, 0.70
+WeatherVibe.Intensity.InternalRange.NIGHT.MediumRain          = 0.45, 0.70
 
-# Light Snow (6)
+# Heavy Rain (5)  -  49% to 93%
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.LightSnow     = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.AFTERNOON.LightSnow   = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.EVENING.LightSnow     = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.NIGHT.LightSnow       = 0.25, 0.60
+WeatherVibe.Intensity.InternalRange.MORNING.HeavyRain         = 0.62, 0.95
+WeatherVibe.Intensity.InternalRange.AFTERNOON.HeavyRain       = 0.62, 0.95
+WeatherVibe.Intensity.InternalRange.EVENING.HeavyRain         = 0.62, 0.95
+WeatherVibe.Intensity.InternalRange.NIGHT.HeavyRain           = 0.62, 0.95
+
+# Light Snow (6)  -  snow is sparse (a fifth as many flakes as rain has drops),
+# so its bands sit a little higher than rain's
+# ----------------------------------------------------------------------
+WeatherVibe.Intensity.InternalRange.MORNING.LightSnow         = 0.32, 0.52
+WeatherVibe.Intensity.InternalRange.AFTERNOON.LightSnow       = 0.32, 0.52
+WeatherVibe.Intensity.InternalRange.EVENING.LightSnow         = 0.32, 0.52
+WeatherVibe.Intensity.InternalRange.NIGHT.LightSnow           = 0.32, 0.52
 
 # Medium Snow (7)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.MediumSnow    = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.AFTERNOON.MediumSnow  = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.EVENING.MediumSnow    = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.NIGHT.MediumSnow      = 0.25, 0.70
+WeatherVibe.Intensity.InternalRange.MORNING.MediumSnow        = 0.48, 0.74
+WeatherVibe.Intensity.InternalRange.AFTERNOON.MediumSnow      = 0.48, 0.74
+WeatherVibe.Intensity.InternalRange.EVENING.MediumSnow        = 0.48, 0.74
+WeatherVibe.Intensity.InternalRange.NIGHT.MediumSnow          = 0.48, 0.74
 
 # Heavy Snow (8)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.HeavySnow     = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.AFTERNOON.HeavySnow   = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.EVENING.HeavySnow     = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.NIGHT.HeavySnow       = 0.25, 0.90
+WeatherVibe.Intensity.InternalRange.MORNING.HeavySnow         = 0.66, 1.00
+WeatherVibe.Intensity.InternalRange.AFTERNOON.HeavySnow       = 0.66, 1.00
+WeatherVibe.Intensity.InternalRange.EVENING.HeavySnow         = 0.66, 1.00
+WeatherVibe.Intensity.InternalRange.NIGHT.HeavySnow           = 0.66, 1.00
 
 # Light Sandstorm (22)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.LightSandstorm   = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.AFTERNOON.LightSandstorm = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.EVENING.LightSandstorm   = 0.25, 0.60
-WeatherVibe.Intensity.InternalRange.NIGHT.LightSandstorm     = 0.25, 0.60
+WeatherVibe.Intensity.InternalRange.MORNING.LightSandstorm    = 0.30, 0.50
+WeatherVibe.Intensity.InternalRange.AFTERNOON.LightSandstorm  = 0.30, 0.50
+WeatherVibe.Intensity.InternalRange.EVENING.LightSandstorm    = 0.30, 0.50
+WeatherVibe.Intensity.InternalRange.NIGHT.LightSandstorm      = 0.30, 0.50
 
 # Medium Sandstorm (41)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.MediumSandstorm  = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.AFTERNOON.MediumSandstorm= 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.EVENING.MediumSandstorm  = 0.25, 0.70
-WeatherVibe.Intensity.InternalRange.NIGHT.MediumSandstorm    = 0.25, 0.70
+WeatherVibe.Intensity.InternalRange.MORNING.MediumSandstorm   = 0.45, 0.70
+WeatherVibe.Intensity.InternalRange.AFTERNOON.MediumSandstorm = 0.45, 0.70
+WeatherVibe.Intensity.InternalRange.EVENING.MediumSandstorm   = 0.45, 0.70
+WeatherVibe.Intensity.InternalRange.NIGHT.MediumSandstorm     = 0.45, 0.70
 
 # Heavy Sandstorm (42)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.HeavySandstorm   = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.AFTERNOON.HeavySandstorm = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.EVENING.HeavySandstorm   = 0.25, 0.90
-WeatherVibe.Intensity.InternalRange.NIGHT.HeavySandstorm     = 0.25, 0.90
+WeatherVibe.Intensity.InternalRange.MORNING.HeavySandstorm    = 0.62, 0.95
+WeatherVibe.Intensity.InternalRange.AFTERNOON.HeavySandstorm  = 0.62, 0.95
+WeatherVibe.Intensity.InternalRange.EVENING.HeavySandstorm    = 0.62, 0.95
+WeatherVibe.Intensity.InternalRange.NIGHT.HeavySandstorm      = 0.62, 0.95
 
-# Thunders (86)
+# Thunders (86)  -  a thunderstorm is a downpour: drawn as rain, with the
+# server adding the thunder (see "Thunder" above)
 # ----------------------------------------------------------------------
-WeatherVibe.Intensity.InternalRange.MORNING.Thunders         = 0.15, 0.40
-WeatherVibe.Intensity.InternalRange.AFTERNOON.Thunders       = 0.15, 0.40
-WeatherVibe.Intensity.InternalRange.EVENING.Thunders         = 0.15, 0.40
-WeatherVibe.Intensity.InternalRange.NIGHT.Thunders           = 0.15, 0.50
+WeatherVibe.Intensity.InternalRange.MORNING.Thunders          = 0.60, 0.95
+WeatherVibe.Intensity.InternalRange.AFTERNOON.Thunders        = 0.60, 0.95
+WeatherVibe.Intensity.InternalRange.EVENING.Thunders          = 0.60, 0.95
+WeatherVibe.Intensity.InternalRange.NIGHT.Thunders            = 0.60, 0.95
+
+# ThunderSnow  -  thunder over a blizzard; drawn as snow
+# ----------------------------------------------------------------------
+WeatherVibe.Intensity.InternalRange.MORNING.ThunderSnow       = 0.66, 1.00
+WeatherVibe.Intensity.InternalRange.AFTERNOON.ThunderSnow     = 0.66, 1.00
+WeatherVibe.Intensity.InternalRange.EVENING.ThunderSnow       = 0.66, 1.00
+WeatherVibe.Intensity.InternalRange.NIGHT.ThunderSnow         = 0.66, 1.00
+
+# DryThunders  -  a storm with nothing falling: the darkest sky there is,
+# and the thunder
+# ----------------------------------------------------------------------
+WeatherVibe.Intensity.InternalRange.MORNING.DryThunders       = 0.20, 0.25
+WeatherVibe.Intensity.InternalRange.AFTERNOON.DryThunders     = 0.20, 0.25
+WeatherVibe.Intensity.InternalRange.EVENING.DryThunders       = 0.20, 0.25
+WeatherVibe.Intensity.InternalRange.NIGHT.DryThunders         = 0.20, 0.25
 
 
 #######################################################################################################
@@ -325,7 +464,10 @@ WeatherVibe.Intensity.InternalRange.NIGHT.Thunders           = 0.15, 0.50
 #           3=LightRain, 4=MediumRain, 5=HeavyRain,
 #           6=LightSnow, 7=MediumSnow, 8=HeavySnow,
 #           22=LightSandstorm, 41=MediumSandstorm, 42=HeavySandstorm,
-#           86=Thunders
+#           86=Thunders  -  the storm that suits the profile: a rainstorm where
+#              its tables have rain, thundersnow where they have only snow, a
+#              dry storm where they have neither. To pick one yourself, write
+#              ThunderSnow or DryThunders in the row, or set <Name>.Thunder.Style.
 # For Fine the percentage is how clear the sky is: 100 = cloudless, low = overcast.
 # A profile that leaves a season out borrows a neighbouring one.
 #
@@ -337,6 +479,10 @@ WeatherVibe.Intensity.InternalRange.NIGHT.Thunders           = 0.15, 0.50
 #   .Transition.MinHoldSeconds             least time weather stays once it has arrived
 #   .DayPartWeight.<DAYPART>.<State>       this profile's own time-of-day multiplier
 #   .Neighbors = ProfileA, ProfileB        whose storms drift here (listed at the end of this file)
+#   .Thunder.Style = auto|rain|snow|dry    what 86 means here (auto: from its tables)
+#   .Thunder.Sounds = id, id, ...          its own thunderclaps instead of the global ones
+#   .Sandstorm.Skin = sand|ash|ember       what its sandstorm looks like (see "Looks" above)
+#   .Rain.Skin = rain|dark|red             what its rain looks like
 #######################################################################################################
 #######################################################################################################
 
@@ -3494,8 +3640,8 @@ WeatherVibe.Profile.TerokkarForest.Transition.MinHoldSeconds=60
 #
 # Mapped with WeatherVibe.AreaProfile (below), these override the zone's weather
 # for anyone standing in that area. They are the same kind of profile as the
-# ones above; these four keep one table all year (only Spring is given, the
-# other seasons borrow it).
+# ones above; these keep one table all year (only Spring is given, the other
+# seasons borrow it).
 #######################################################################################################
 #######################################################################################################
 
@@ -3579,6 +3725,100 @@ WeatherVibe.Profile.ArgentTournament.Transition.Max.Consecutive.Same=4
 WeatherVibe.Profile.ArgentTournament.Transition.MinHoldSeconds=60
 
 
+#======================================================================
+# HauntedGround  -  Raven Hill and its cemetery (Duskwood)
+# Theme: The dead do not rest here and the mist never lifts.
+# Duskwood is foggy; among the graves you cannot see the next headstone.
+#======================================================================
+
+WeatherVibe.Profile.HauntedGround.Spring.1=5,0,5,15
+WeatherVibe.Profile.HauntedGround.Spring.2=75,1,60,95
+WeatherVibe.Profile.HauntedGround.Spring.3=20,3,20,40
+
+WeatherVibe.Profile.HauntedGround.Transition.Step.TimeSeconds.Min=25
+WeatherVibe.Profile.HauntedGround.Transition.Step.TimeSeconds.Max=55
+WeatherVibe.Profile.HauntedGround.Transition.StepSize.Perc=10
+WeatherVibe.Profile.HauntedGround.Transition.Max.Changes.Per.Hour=4
+WeatherVibe.Profile.HauntedGround.Transition.Max.Consecutive.Same=5
+WeatherVibe.Profile.HauntedGround.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# FelTaint  -  Where the Legion left its mark
+# Jaedenar in Felwood; Felfire Hill and Demon Fall in Ashenvale.
+# Theme: The air itself is wrong. A sick murk, and a storm that
+# grumbles overhead without ever breaking. Nothing clean falls here.
+#======================================================================
+
+WeatherVibe.Profile.FelTaint.Spring.1=10,0,10,20
+WeatherVibe.Profile.FelTaint.Spring.2=55,1,50,85
+WeatherVibe.Profile.FelTaint.Spring.3=35,DryThunders,40,80
+
+WeatherVibe.Profile.FelTaint.Transition.Step.TimeSeconds.Min=25
+WeatherVibe.Profile.FelTaint.Transition.Step.TimeSeconds.Max=50
+WeatherVibe.Profile.FelTaint.Transition.StepSize.Perc=10
+WeatherVibe.Profile.FelTaint.Transition.Max.Changes.Per.Hour=5
+WeatherVibe.Profile.FelTaint.Transition.Max.Consecutive.Same=4
+WeatherVibe.Profile.FelTaint.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# Karazhan  -  The tower in Deadwind Pass
+# Theme: Whatever Medivh left behind has never stopped pulling at the sky.
+# A storm sits over the tower: thunder most of the time, little rain.
+#======================================================================
+
+WeatherVibe.Profile.Karazhan.Spring.1=10,0,10,20
+WeatherVibe.Profile.Karazhan.Spring.2=30,1,50,80
+WeatherVibe.Profile.Karazhan.Spring.3=15,3,20,40
+WeatherVibe.Profile.Karazhan.Spring.4=45,DryThunders,50,90
+
+WeatherVibe.Profile.Karazhan.Transition.Step.TimeSeconds.Min=20
+WeatherVibe.Profile.Karazhan.Transition.Step.TimeSeconds.Max=45
+WeatherVibe.Profile.Karazhan.Transition.StepSize.Perc=15
+WeatherVibe.Profile.Karazhan.Transition.Max.Changes.Per.Hour=6
+WeatherVibe.Profile.Karazhan.Transition.Max.Consecutive.Same=4
+WeatherVibe.Profile.Karazhan.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# Thunderfall  -  The lightning-struck slope of the Storm Peaks
+# Theme: Named for what happens here. Snow like the rest of the peaks,
+# with thunder rolling through it more often than not.
+#======================================================================
+
+WeatherVibe.Profile.Thunderfall.Spring.1=5,1,40,70
+WeatherVibe.Profile.Thunderfall.Spring.2=20,6,40,70
+WeatherVibe.Profile.Thunderfall.Spring.3=30,7,40,70
+WeatherVibe.Profile.Thunderfall.Spring.4=15,8,40,80
+WeatherVibe.Profile.Thunderfall.Spring.5=30,ThunderSnow,50,90
+
+WeatherVibe.Profile.Thunderfall.Transition.Step.TimeSeconds.Min=15
+WeatherVibe.Profile.Thunderfall.Transition.Step.TimeSeconds.Max=35
+WeatherVibe.Profile.Thunderfall.Transition.StepSize.Perc=20
+WeatherVibe.Profile.Thunderfall.Transition.Max.Changes.Per.Hour=8
+WeatherVibe.Profile.Thunderfall.Transition.Max.Consecutive.Same=3
+WeatherVibe.Profile.Thunderfall.Transition.MinHoldSeconds=60
+
+
+#======================================================================
+# HallowedGround  -  Light's Hope Chapel (Eastern Plaguelands)
+# Theme: The one clean patch in a dead land. The blight stops at the
+# chapel's ground: clear more often than not, a little honest rain.
+#======================================================================
+
+WeatherVibe.Profile.HallowedGround.Spring.1=70,0,70,100
+WeatherVibe.Profile.HallowedGround.Spring.2=15,1,20,40
+WeatherVibe.Profile.HallowedGround.Spring.3=15,3,20,40
+
+WeatherVibe.Profile.HallowedGround.Transition.Step.TimeSeconds.Min=30
+WeatherVibe.Profile.HallowedGround.Transition.Step.TimeSeconds.Max=60
+WeatherVibe.Profile.HallowedGround.Transition.StepSize.Perc=10
+WeatherVibe.Profile.HallowedGround.Transition.Max.Changes.Per.Hour=4
+WeatherVibe.Profile.HallowedGround.Transition.Max.Consecutive.Same=5
+WeatherVibe.Profile.HallowedGround.Transition.MinHoldSeconds=60
+
+
 #######################################################################################################
 #######################################################################################################
 # Zone-to-Profile Mappings
@@ -3643,7 +3883,9 @@ WeatherVibe.ZoneProfile.45=1377,Silithus
 WeatherVibe.ZoneProfile.46=1397,EmeraldForest
 
 # --- Seas ---
-WeatherVibe.ZoneProfile.47=207,TheGreatSea
+# The Great Sea (Eastern Kingdoms side), The Veiled Sea. The rest are further down.
+# (47 used to be 207, which is an area on the Deadmines instance map, not the sea.)
+WeatherVibe.ZoneProfile.47=214,TheGreatSea
 WeatherVibe.ZoneProfile.48=457,TheGreatSea
 
 # --- Battlegrounds (Eastern Kingdoms) ---
@@ -3671,7 +3913,8 @@ WeatherVibe.ZoneProfile.61=3524,AzuremystIsle
 WeatherVibe.ZoneProfile.62=3525,BloodmystIsle
 
 # --- Caverns of Time ---
-WeatherVibe.ZoneProfile.63=3605,MountHyjal
+# Hyjal Summit, the raid. (Was 3605 "Hyjal Past", which sits on the Old Hillsbrad map.)
+WeatherVibe.ZoneProfile.63=3606,MountHyjal
 
 # --- Northrend ---
 WeatherVibe.ZoneProfile.64=65,Dragonblight
@@ -3681,7 +3924,8 @@ WeatherVibe.ZoneProfile.67=210,Icecrown
 WeatherVibe.ZoneProfile.68=394,GrizzlyHills
 WeatherVibe.ZoneProfile.69=495,HowlingFjord
 WeatherVibe.ZoneProfile.70=3711,SholazarBasin
-WeatherVibe.ZoneProfile.71=3817,Icecrown
+# Hrothgar's Landing, the island off Icecrown. (71 used to be 3817, a test zone.)
+WeatherVibe.ZoneProfile.71=4742,FrozenSea
 WeatherVibe.ZoneProfile.72=4197,Wintergrasp
 WeatherVibe.ZoneProfile.73=4201,GrizzlyHills
 
@@ -3719,6 +3963,27 @@ WeatherVibe.ZoneProfile.87=2597,AlteracMountains
 WeatherVibe.ZoneProfile.88=3277,Ashenvale
 WeatherVibe.ZoneProfile.89=4710,FrozenSea
 
+# --- Seas (continued) ---
+# The Great Sea (Kalimdor side), The Forbidding Sea, The North Sea and The Veiled
+# Sea off Quel'Thalas and the Azuremyst Isles, The North Sea off Northrend
+WeatherVibe.ZoneProfile.90=332,TheGreatSea
+WeatherVibe.ZoneProfile.91=308,TheGreatSea
+WeatherVibe.ZoneProfile.92=3455,TheGreatSea
+WeatherVibe.ZoneProfile.93=3479,TheGreatSea
+WeatherVibe.ZoneProfile.94=4630,FrozenSea
+
+# --- The small zones in between ---
+# Each is its own zone to the game. Unmapped, the sky would blink clear while
+# you cross it: Dun Algaz, Thandol Span, Thoradin's Wall, Lordamere Lake,
+# Southfury River, Gates of Ahn'Qiraj, Auchindoun.
+WeatherVibe.ZoneProfile.95=269,Wetlands
+WeatherVibe.ZoneProfile.96=330,Wetlands
+WeatherVibe.ZoneProfile.97=293,ArathiHighlands
+WeatherVibe.ZoneProfile.98=170,SilverpineForest
+WeatherVibe.ZoneProfile.99=377,Durotar
+WeatherVibe.ZoneProfile.100=3478,AhnQiraj
+WeatherVibe.ZoneProfile.101=3917,TerokkarForest
+
 
 #######################################################################################################
 #######################################################################################################
@@ -3752,6 +4017,25 @@ WeatherVibe.AreaProfile.11=4672,ArgentTournament
 WeatherVibe.AreaProfile.12=4673,ArgentTournament
 WeatherVibe.AreaProfile.13=4676,ArgentTournament
 WeatherVibe.AreaProfile.14=4677,ArgentTournament
+
+# --- Duskwood: Raven Hill and its cemetery ---
+WeatherVibe.AreaProfile.15=94,HauntedGround
+WeatherVibe.AreaProfile.16=492,HauntedGround
+
+# --- Fel-tainted ground: Jaedenar (Felwood); Felfire Hill, Demon Fall Canyon and Ridge (Ashenvale) ---
+WeatherVibe.AreaProfile.17=1763,FelTaint
+WeatherVibe.AreaProfile.18=434,FelTaint
+WeatherVibe.AreaProfile.19=435,FelTaint
+WeatherVibe.AreaProfile.20=436,FelTaint
+
+# --- Deadwind Pass: Karazhan ---
+WeatherVibe.AreaProfile.21=2562,Karazhan
+
+# --- Storm Peaks: Thunderfall ---
+WeatherVibe.AreaProfile.22=4440,Thunderfall
+
+# --- Eastern Plaguelands: Light's Hope Chapel ---
+WeatherVibe.AreaProfile.23=2268,HallowedGround
 
 
 #######################################################################################################

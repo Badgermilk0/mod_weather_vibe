@@ -1,0 +1,2309 @@
+# AreaTable.dbc of a stock 3.3.5a client (enus). Written by tools/wv_client_data.py; do not edit.
+# id	parent	map	map_type	map_name	name
+1	0	0	world	Azeroth	Dun Morogh
+2	40	0	world	Azeroth	Longshore
+3	0	0	world	Azeroth	Badlands
+4	0	0	world	Azeroth	Blasted Lands
+7	33	0	world	Azeroth	Blackwater Cove
+8	0	0	world	Azeroth	Swamp of Sorrows
+9	12	0	world	Azeroth	Northshire Valley
+10	0	0	world	Azeroth	Duskwood
+11	0	0	world	Azeroth	Wetlands
+12	0	0	world	Azeroth	Elwynn Forest
+13	10	0	world	Azeroth	The World Tree
+14	0	1	world	Kalimdor	Durotar
+15	0	1	world	Kalimdor	Dustwallow Marsh
+16	0	1	world	Kalimdor	Azshara
+17	0	1	world	Kalimdor	The Barrens
+18	12	0	world	Azeroth	Crystal Lake
+19	33	0	world	Azeroth	Zul'Gurub
+20	40	0	world	Azeroth	Moonbrook
+21	0	0	world	Azeroth	Kul Tiras
+22	0	451	world	development	Programmer Isle
+23	12	0	world	Azeroth	Northshire River
+24	12	0	world	Azeroth	Northshire Abbey
+25	0	0	world	Azeroth	Blackrock Mountain
+26	40	0	world	Azeroth	Lighthouse
+28	0	0	world	Azeroth	Western Plaguelands
+30	0	0	world	Azeroth	Nine
+32	10	0	world	Azeroth	The Cemetary
+33	0	0	world	Azeroth	Stranglethorn Vale
+34	12	0	world	Azeroth	Echo Ridge Mine
+35	33	0	world	Azeroth	Booty Bay
+36	0	0	world	Azeroth	Alterac Mountains
+37	33	0	world	Azeroth	Lake Nazferiti
+38	0	0	world	Azeroth	Loch Modan
+40	0	0	world	Azeroth	Westfall
+41	0	0	world	Azeroth	Deadwind Pass
+42	10	0	world	Azeroth	Darkshire
+43	33	0	world	Azeroth	Wild Shore
+44	0	0	world	Azeroth	Redridge Mountains
+45	0	0	world	Azeroth	Arathi Highlands
+46	0	0	world	Azeroth	Burning Steppes
+47	0	0	world	Azeroth	The Hinterlands
+49	22	451	world	development	Dead Man's Hole
+51	0	0	world	Azeroth	Searing Gorge
+53	12	0	world	Azeroth	Thieves Camp
+54	12	0	world	Azeroth	Jasperlode Mine
+55	12	0	world	Azeroth	Valley of Heroes UNUSED
+56	12	0	world	Azeroth	Heroes' Vigil
+57	12	0	world	Azeroth	Fargodeep Mine
+59	12	0	world	Azeroth	Northshire Vineyards
+60	12	0	world	Azeroth	Forest's Edge
+61	12	0	world	Azeroth	Thunder Falls
+62	12	0	world	Azeroth	Brackwell Pumpkin Patch
+63	12	0	world	Azeroth	The Stonefield Farm
+64	12	0	world	Azeroth	The Maclure Vineyards
+65	0	571	world	Northrend	Dragonblight
+66	0	571	world	Northrend	Zul'Drak
+67	0	571	world	Northrend	The Storm Peaks
+68	44	0	world	Azeroth	Lake Everstill
+69	44	0	world	Azeroth	Lakeshire
+70	44	0	world	Azeroth	Stonewatch
+71	44	0	world	Azeroth	Stonewatch Falls
+72	4	0	world	Azeroth	The Dark Portal
+73	4	0	world	Azeroth	The Tainted Scar
+74	8	0	world	Azeroth	Pool of Tears
+75	8	0	world	Azeroth	Stonard
+76	8	0	world	Azeroth	Fallow Sanctuary
+77	1	0	world	Azeroth	Anvilmar
+80	12	0	world	Azeroth	Stormwind Mountains
+81	22	451	world	development	Jeff NE Quadrant Changed
+82	22	451	world	development	Jeff NW Quadrant
+83	22	451	world	development	Jeff SE Quadrant
+84	22	451	world	development	Jeff SW Quadrant
+85	0	0	world	Azeroth	Tirisfal Glades
+86	12	0	world	Azeroth	Stone Cairn Lake
+87	12	0	world	Azeroth	Goldshire
+88	12	0	world	Azeroth	Eastvale Logging Camp
+89	12	0	world	Azeroth	Mirror Lake Orchard
+91	12	0	world	Azeroth	Tower of Azora
+92	12	0	world	Azeroth	Mirror Lake
+93	10	0	world	Azeroth	Vul'Gol Ogre Mound
+94	10	0	world	Azeroth	Raven Hill
+95	44	0	world	Azeroth	Redridge Canyons
+96	44	0	world	Azeroth	Tower of Ilgalar
+97	44	0	world	Azeroth	Alther's Mill
+98	44	0	world	Azeroth	Rethban Caverns
+99	33	0	world	Azeroth	Rebel Camp
+100	33	0	world	Azeroth	Nesingwary's Expedition
+101	33	0	world	Azeroth	Kurzen's Compound
+102	33	0	world	Azeroth	Ruins of Zul'Kunda
+103	33	0	world	Azeroth	Ruins of Zul'Mamwe
+104	33	0	world	Azeroth	The Vile Reef
+105	33	0	world	Azeroth	Mosh'Ogg Ogre Mound
+106	33	0	world	Azeroth	The Stockpile
+107	40	0	world	Azeroth	Saldean's Farm
+108	40	0	world	Azeroth	Sentinel Hill
+109	40	0	world	Azeroth	Furlbrow's Pumpkin Farm
+111	40	0	world	Azeroth	Jangolode Mine
+113	40	0	world	Azeroth	Gold Coast Quarry
+115	40	0	world	Azeroth	Westfall Lighthouse
+116	8	0	world	Azeroth	Misty Valley
+117	33	0	world	Azeroth	Grom'gol Base Camp
+118	11	0	world	Azeroth	Whelgar's Excavation Site
+120	12	0	world	Azeroth	Westbrook Garrison
+121	10	0	world	Azeroth	Tranquil Gardens Cemetery
+122	33	0	world	Azeroth	Zuuldaia Ruins
+123	33	0	world	Azeroth	Bal'lal Ruins
+125	33	0	world	Azeroth	Kal'ai Ruins
+126	33	0	world	Azeroth	Tkashi Ruins
+127	33	0	world	Azeroth	Balia'mah Ruins
+128	33	0	world	Azeroth	Ziata'jai Ruins
+129	33	0	world	Azeroth	Mizjah Ruins
+130	0	0	world	Azeroth	Silverpine Forest
+131	1	0	world	Azeroth	Kharanos
+132	1	0	world	Azeroth	Coldridge Valley
+133	1	0	world	Azeroth	Gnomeregan
+134	1	0	world	Azeroth	Gol'Bolar Quarry
+135	1	0	world	Azeroth	Frostmane Hold
+136	1	0	world	Azeroth	The Grizzled Den
+137	1	0	world	Azeroth	Brewnall Village
+138	1	0	world	Azeroth	Misty Pine Refuge
+139	0	0	world	Azeroth	Eastern Plaguelands
+141	0	1	world	Kalimdor	Teldrassil
+142	38	0	world	Azeroth	Ironband's Excavation Site
+143	38	0	world	Azeroth	Mo'grosh Stronghold
+144	38	0	world	Azeroth	Thelsamar
+145	38	0	world	Azeroth	Algaz Gate
+146	38	0	world	Azeroth	Stonewrought Dam
+147	38	0	world	Azeroth	The Farstrider Lodge
+148	0	1	world	Kalimdor	Darkshore
+149	38	0	world	Azeroth	Silver Stream Mine
+150	11	0	world	Azeroth	Menethil Harbor
+151	0	451	world	development	Designer Island
+152	85	0	world	Azeroth	The Bulwark
+153	85	0	world	Azeroth	Ruins of Lordaeron
+154	85	0	world	Azeroth	Deathknell
+155	85	0	world	Azeroth	Night Web's Hollow
+156	85	0	world	Azeroth	Solliden Farmstead
+157	85	0	world	Azeroth	Agamand Mills
+158	85	0	world	Azeroth	Agamand Family Crypt
+159	85	0	world	Azeroth	Brill
+160	85	0	world	Azeroth	Whispering Gardens
+161	85	0	world	Azeroth	Terrace of Repose
+162	85	0	world	Azeroth	Brightwater Lake
+163	85	0	world	Azeroth	Gunther's Retreat
+164	85	0	world	Azeroth	Garren's Haunt
+165	85	0	world	Azeroth	Balnir Farmstead
+166	85	0	world	Azeroth	Cold Hearth Manor
+167	85	0	world	Azeroth	Crusader Outpost
+168	85	0	world	Azeroth	The North Coast
+169	85	0	world	Azeroth	Whispering Shore
+170	0	0	world	Azeroth	Lordamere Lake
+172	130	0	world	Azeroth	Fenris Isle
+173	85	0	world	Azeroth	Faol's Rest
+186	141	1	world	Kalimdor	Dolanaar
+187	141	1	world	Kalimdor	Darnassus UNUSED
+188	141	1	world	Kalimdor	Shadowglen
+189	1	0	world	Azeroth	Steelgrill's Depot
+190	28	0	world	Azeroth	Hearthglen
+192	28	0	world	Azeroth	Northridge Lumber Camp
+193	28	0	world	Azeroth	Ruins of Andorhal
+195	28	0	world	Azeroth	School of Necromancy
+196	28	0	world	Azeroth	Uther's Tomb
+197	28	0	world	Azeroth	Sorrow Hill
+198	28	0	world	Azeroth	The Weeping Cave
+199	28	0	world	Azeroth	Felstone Field
+200	28	0	world	Azeroth	Dalson's Tears
+201	28	0	world	Azeroth	Gahrron's Withering
+202	28	0	world	Azeroth	The Writhing Haunt
+203	28	0	world	Azeroth	Mardenholde Keep
+204	130	0	world	Azeroth	Pyrewood Village
+205	11	0	world	Azeroth	Dun Modr
+206	0	574	dungeon	Valgarde70	Utgarde Keep
+207	0	36	dungeon	DeadminesInstance	The Great Sea
+208	0	36	dungeon	DeadminesInstance	Unused Ironcladcove
+209	0	33	dungeon	Shadowfang	Shadowfang Keep
+210	0	571	world	Northrend	Icecrown
+211	1	0	world	Azeroth	Iceflow Lake
+212	1	0	world	Azeroth	Helm's Bed Lake
+213	130	0	world	Azeroth	Deep Elem Mine
+214	0	0	world	Azeroth	The Great Sea
+215	0	1	world	Kalimdor	Mulgore
+219	40	0	world	Azeroth	Alexston Farmstead
+220	215	1	world	Kalimdor	Red Cloud Mesa
+221	215	1	world	Kalimdor	Camp Narache
+222	215	1	world	Kalimdor	Bloodhoof Village
+223	215	1	world	Kalimdor	Stonebull Lake
+224	215	1	world	Kalimdor	Ravaged Caravan
+225	215	1	world	Kalimdor	Red Rocks
+226	130	0	world	Azeroth	The Skittering Dark
+227	130	0	world	Azeroth	Valgan's Field
+228	130	0	world	Azeroth	The Sepulcher
+229	130	0	world	Azeroth	Olsen's Farthing
+230	130	0	world	Azeroth	The Greymane Wall
+231	130	0	world	Azeroth	Beren's Peril
+232	130	0	world	Azeroth	The Dawning Isles
+233	130	0	world	Azeroth	Ambermill
+235	130	0	world	Azeroth	Fenris Keep
+236	130	0	world	Azeroth	Shadowfang Keep
+237	130	0	world	Azeroth	The Decrepit Ferry
+238	130	0	world	Azeroth	Malden's Orchard
+239	130	0	world	Azeroth	The Ivar Patch
+240	130	0	world	Azeroth	The Dead Field
+241	10	0	world	Azeroth	The Rotting Orchard
+242	10	0	world	Azeroth	Brightwood Grove
+243	10	0	world	Azeroth	Forlorn Rowe
+244	10	0	world	Azeroth	The Whipple Estate
+245	10	0	world	Azeroth	The Yorgen Farmstead
+246	51	0	world	Azeroth	The Cauldron
+247	51	0	world	Azeroth	Grimesilt Dig Site
+249	46	0	world	Azeroth	Dreadmaul Rock
+250	46	0	world	Azeroth	Ruins of Thaurissan
+251	46	0	world	Azeroth	Flame Crest
+252	46	0	world	Azeroth	Blackrock Stronghold
+253	46	0	world	Azeroth	The Pillar of Ash
+254	46	0	world	Azeroth	Blackrock Mountain
+255	46	0	world	Azeroth	Altar of Storms
+256	141	1	world	Kalimdor	Aldrassil
+257	141	1	world	Kalimdor	Shadowthread Cave
+258	141	1	world	Kalimdor	Fel Rock
+259	141	1	world	Kalimdor	Lake Al'Ameth
+260	141	1	world	Kalimdor	Starbreeze Village
+261	141	1	world	Kalimdor	Gnarlpine Hold
+262	141	1	world	Kalimdor	Ban'ethil Barrow Den
+263	141	1	world	Kalimdor	The Cleft
+264	141	1	world	Kalimdor	The Oracle Glade
+265	141	1	world	Kalimdor	Wellspring River
+266	141	1	world	Kalimdor	Wellspring Lake
+267	0	0	world	Azeroth	Hillsbrad Foothills
+268	0	37	world	PVPZone02	Azshara Crater
+269	0	0	world	Azeroth	Dun Algaz
+271	267	0	world	Azeroth	Southshore
+272	267	0	world	Azeroth	Tarren Mill
+275	267	0	world	Azeroth	Durnholde Keep
+276	0	0	world	Azeroth	UNUSED Stonewrought Pass
+277	36	0	world	Azeroth	The Foothill Caverns
+278	36	0	world	Azeroth	Lordamere Internment Camp
+279	36	0	world	Azeroth	Dalaran Crater
+280	36	0	world	Azeroth	Strahnbrad
+281	36	0	world	Azeroth	Ruins of Alterac
+282	36	0	world	Azeroth	Crushridge Hold
+283	36	0	world	Azeroth	Slaughter Hollow
+284	36	0	world	Azeroth	The Uplands
+285	267	0	world	Azeroth	Southpoint Tower
+286	267	0	world	Azeroth	Hillsbrad Fields
+287	267	0	world	Azeroth	Hillsbrad
+288	267	0	world	Azeroth	Azurelode Mine
+289	267	0	world	Azeroth	Nethander Stead
+290	267	0	world	Azeroth	Dun Garok
+293	0	0	world	Azeroth	Thoradin's Wall
+294	267	0	world	Azeroth	Eastern Strand
+295	267	0	world	Azeroth	Western Strand
+296	0	0	world	Azeroth	South Seas UNUSED
+297	33	0	world	Azeroth	Jaguero Isle
+298	11	0	world	Azeroth	Baradin Bay
+299	11	0	world	Azeroth	Menethil Bay
+300	8	0	world	Azeroth	Misty Reed Strand
+301	33	0	world	Azeroth	The Savage Coast
+302	33	0	world	Azeroth	The Crystal Shore
+303	33	0	world	Azeroth	Shell Beach
+305	130	0	world	Azeroth	North Tide's Run
+306	130	0	world	Azeroth	South Tide's Run
+307	47	0	world	Azeroth	The Overlook Cliffs
+308	0	0	world	Azeroth	The Forbidding Sea
+309	11	0	world	Azeroth	Ironbeard's Tomb
+310	33	0	world	Azeroth	Crystalvein Mine
+311	33	0	world	Azeroth	Ruins of Aboraz
+312	33	0	world	Azeroth	Janeiro's Point
+313	45	0	world	Azeroth	Northfold Manor
+314	45	0	world	Azeroth	Go'Shek Farm
+315	45	0	world	Azeroth	Dabyrie's Farmstead
+316	45	0	world	Azeroth	Boulderfist Hall
+317	45	0	world	Azeroth	Witherbark Village
+318	45	0	world	Azeroth	Drywhisker Gorge
+320	45	0	world	Azeroth	Refuge Pointe
+321	45	0	world	Azeroth	Hammerfall
+322	45	0	world	Azeroth	Blackwater Shipwrecks
+323	45	0	world	Azeroth	O'Breen's Camp
+324	45	0	world	Azeroth	Stromgarde Keep
+325	45	0	world	Azeroth	The Tower of Arathor
+326	45	0	world	Azeroth	The Sanctum
+327	45	0	world	Azeroth	Faldir's Cove
+328	45	0	world	Azeroth	The Drowned Reef
+330	0	0	world	Azeroth	Thandol Span
+331	0	1	world	Kalimdor	Ashenvale
+332	0	1	world	Kalimdor	The Great Sea
+333	45	0	world	Azeroth	Circle of East Binding
+334	45	0	world	Azeroth	Circle of West Binding
+335	45	0	world	Azeroth	Circle of Inner Binding
+336	45	0	world	Azeroth	Circle of Outer Binding
+337	3	0	world	Azeroth	Apocryphan's Rest
+338	3	0	world	Azeroth	Angor Fortress
+339	3	0	world	Azeroth	Lethlor Ravine
+340	3	0	world	Azeroth	Kargath
+341	3	0	world	Azeroth	Camp Kosh
+342	3	0	world	Azeroth	Camp Boff
+343	3	0	world	Azeroth	Camp Wurg
+344	3	0	world	Azeroth	Camp Cagg
+345	3	0	world	Azeroth	Agmond's End
+346	3	0	world	Azeroth	Hammertoe's Digsite
+347	3	0	world	Azeroth	Dustbelch Grotto
+348	47	0	world	Azeroth	Aerie Peak
+349	47	0	world	Azeroth	Wildhammer Keep
+350	47	0	world	Azeroth	Quel'Danil Lodge
+351	47	0	world	Azeroth	Skulk Rock
+352	47	0	world	Azeroth	Zun'watha
+353	47	0	world	Azeroth	Shadra'Alor
+354	47	0	world	Azeroth	Jintha'Alor
+355	47	0	world	Azeroth	The Altar of Zul
+356	47	0	world	Azeroth	Seradane
+357	0	1	world	Kalimdor	Feralas
+358	215	1	world	Kalimdor	Brambleblade Ravine
+359	17	1	world	Kalimdor	Bael Modan
+360	215	1	world	Kalimdor	The Venture Co. Mine
+361	0	1	world	Kalimdor	Felwood
+362	14	1	world	Kalimdor	Razor Hill
+363	14	1	world	Kalimdor	Valley of Trials
+364	14	1	world	Kalimdor	The Den
+365	14	1	world	Kalimdor	Burning Blade Coven
+366	14	1	world	Kalimdor	Kolkar Crag
+367	14	1	world	Kalimdor	Sen'jin Village
+368	14	1	world	Kalimdor	Echo Isles
+369	14	1	world	Kalimdor	Thunder Ridge
+370	14	1	world	Kalimdor	Drygulch Ravine
+371	14	1	world	Kalimdor	Dustwind Cave
+372	14	1	world	Kalimdor	Tiragarde Keep
+373	14	1	world	Kalimdor	Scuttle Coast
+374	14	1	world	Kalimdor	Bladefist Bay
+375	14	1	world	Kalimdor	Deadeye Shore
+377	0	1	world	Kalimdor	Southfury River
+378	17	1	world	Kalimdor	Camp Taurajo
+379	17	1	world	Kalimdor	Far Watch Post
+380	17	1	world	Kalimdor	The Crossroads
+381	17	1	world	Kalimdor	Boulder Lode Mine
+382	17	1	world	Kalimdor	The Sludge Fen
+383	17	1	world	Kalimdor	The Dry Hills
+384	17	1	world	Kalimdor	Dreadmist Peak
+385	17	1	world	Kalimdor	Northwatch Hold
+386	17	1	world	Kalimdor	The Forgotten Pools
+387	17	1	world	Kalimdor	Lushwater Oasis
+388	17	1	world	Kalimdor	The Stagnant Oasis
+390	17	1	world	Kalimdor	Field of Giants
+391	17	1	world	Kalimdor	The Merchant Coast
+392	17	1	world	Kalimdor	Ratchet
+393	14	1	world	Kalimdor	Darkspear Strand
+394	0	571	world	Northrend	Grizzly Hills
+395	394	571	world	Northrend	Grizzlemaw
+396	215	1	world	Kalimdor	Winterhoof Water Well
+397	215	1	world	Kalimdor	Thunderhorn Water Well
+398	215	1	world	Kalimdor	Wildmane Water Well
+399	215	1	world	Kalimdor	Skyline Ridge
+400	0	1	world	Kalimdor	Thousand Needles
+401	17	1	world	Kalimdor	The Tidus Stair
+403	15	1	world	Kalimdor	Shady Rest Inn
+404	215	1	world	Kalimdor	Bael'dun Digsite
+405	0	1	world	Kalimdor	Desolace
+406	0	1	world	Kalimdor	Stonetalon Mountains
+407	14	1	world	Kalimdor	Orgrimmar UNUSED
+408	0	0	world	Azeroth	Gillijim's Isle
+409	0	0	world	Azeroth	Island of Doctor Lapidis
+410	14	1	world	Kalimdor	Razorwind Canyon
+411	331	1	world	Kalimdor	Bathran's Haunt
+412	331	1	world	Kalimdor	The Ruins of Ordil'Aran
+413	331	1	world	Kalimdor	Maestra's Post
+414	331	1	world	Kalimdor	The Zoram Strand
+415	331	1	world	Kalimdor	Astranaar
+416	331	1	world	Kalimdor	The Shrine of Aessina
+417	331	1	world	Kalimdor	Fire Scar Shrine
+418	331	1	world	Kalimdor	The Ruins of Stardust
+419	331	1	world	Kalimdor	The Howling Vale
+420	331	1	world	Kalimdor	Silverwind Refuge
+421	331	1	world	Kalimdor	Mystral Lake
+422	331	1	world	Kalimdor	Fallen Sky Lake
+424	331	1	world	Kalimdor	Iris Lake
+425	331	1	world	Kalimdor	Moonwell
+426	331	1	world	Kalimdor	Raynewood Retreat
+427	331	1	world	Kalimdor	The Shady Nook
+428	331	1	world	Kalimdor	Night Run
+429	331	1	world	Kalimdor	Xavian
+430	331	1	world	Kalimdor	Satyrnaar
+431	331	1	world	Kalimdor	Splintertree Post
+432	331	1	world	Kalimdor	The Dor'Danil Barrow Den
+433	331	1	world	Kalimdor	Falfarren River
+434	331	1	world	Kalimdor	Felfire Hill
+435	331	1	world	Kalimdor	Demon Fall Canyon
+436	331	1	world	Kalimdor	Demon Fall Ridge
+437	331	1	world	Kalimdor	Warsong Lumber Camp
+438	331	1	world	Kalimdor	Bough Shadow
+439	400	1	world	Kalimdor	The Shimmering Flats
+440	0	1	world	Kalimdor	Tanaris
+441	331	1	world	Kalimdor	Lake Falathim
+442	148	1	world	Kalimdor	Auberdine
+443	148	1	world	Kalimdor	Ruins of Mathystra
+444	148	1	world	Kalimdor	Tower of Althalaxx
+445	148	1	world	Kalimdor	Cliffspring Falls
+446	148	1	world	Kalimdor	Bashal'Aran
+447	148	1	world	Kalimdor	Ameth'Aran
+448	148	1	world	Kalimdor	Grove of the Ancients
+449	148	1	world	Kalimdor	The Master's Glaive
+450	148	1	world	Kalimdor	Remtravel's Excavation
+452	148	1	world	Kalimdor	Mist's Edge
+453	148	1	world	Kalimdor	The Long Wash
+454	148	1	world	Kalimdor	Wildbend River
+455	148	1	world	Kalimdor	Blackwood Den
+456	148	1	world	Kalimdor	Cliffspring River
+457	0	1	world	Kalimdor	The Veiled Sea
+458	17	1	world	Kalimdor	Gold Road
+459	85	0	world	Azeroth	Scarlet Watch Post
+460	406	1	world	Kalimdor	Sun Rock Retreat
+461	406	1	world	Kalimdor	Windshear Crag
+463	406	1	world	Kalimdor	Cragpool Lake
+464	406	1	world	Kalimdor	Mirkfallon Lake
+465	406	1	world	Kalimdor	The Charred Vale
+466	406	1	world	Kalimdor	Valley of the Bloodfuries
+467	406	1	world	Kalimdor	Stonetalon Peak
+468	406	1	world	Kalimdor	The Talon Den
+469	406	1	world	Kalimdor	Greatwood Vale
+470	215	1	world	Kalimdor	Thunder Bluff UNUSED
+471	215	1	world	Kalimdor	Brave Wind Mesa
+472	215	1	world	Kalimdor	Fire Stone Mesa
+473	215	1	world	Kalimdor	Mantle Rock
+474	215	1	world	Kalimdor	Hunter Rise UNUSED
+475	215	1	world	Kalimdor	Spirit RiseUNUSED
+476	215	1	world	Kalimdor	Elder RiseUNUSED
+477	33	0	world	Azeroth	Ruins of Jubuwal
+478	141	1	world	Kalimdor	Pools of Arlithrien
+479	400	1	world	Kalimdor	The Rustmaul Dig Site
+480	400	1	world	Kalimdor	Camp E'thok
+481	400	1	world	Kalimdor	Splithoof Crag
+482	400	1	world	Kalimdor	Highperch
+483	400	1	world	Kalimdor	The Screeching Canyon
+484	400	1	world	Kalimdor	Freewind Post
+485	400	1	world	Kalimdor	The Great Lift
+486	400	1	world	Kalimdor	Galak Hold
+487	400	1	world	Kalimdor	Roguefeather Den
+488	400	1	world	Kalimdor	The Weathered Nook
+489	357	1	world	Kalimdor	Thalanaar
+490	0	1	world	Kalimdor	Un'Goro Crater
+491	0	47	dungeon	RazorfenKraulInstance	Razorfen Kraul
+492	10	0	world	Azeroth	Raven Hill Cemetery
+493	0	1	world	Kalimdor	Moonglade
+495	0	571	world	Northrend	Howling Fjord
+496	15	1	world	Kalimdor	Brackenwall Village
+497	15	1	world	Kalimdor	Swamplight Manor
+498	15	1	world	Kalimdor	Bloodfen Burrow
+499	15	1	world	Kalimdor	Darkmist Cavern
+500	15	1	world	Kalimdor	Moggle Point
+501	15	1	world	Kalimdor	Beezil's Wreck
+502	15	1	world	Kalimdor	Witch Hill
+503	15	1	world	Kalimdor	Sentry Point
+504	15	1	world	Kalimdor	North Point Tower
+505	15	1	world	Kalimdor	West Point Tower
+506	15	1	world	Kalimdor	Lost Point
+507	15	1	world	Kalimdor	Bluefen
+508	15	1	world	Kalimdor	Stonemaul Ruins
+509	15	1	world	Kalimdor	The Den of Flame
+510	15	1	world	Kalimdor	The Dragonmurk
+511	15	1	world	Kalimdor	Wyrmbog
+512	15	1	world	Kalimdor	Blackhoof Village
+513	15	1	world	Kalimdor	Theramore Isle
+514	15	1	world	Kalimdor	Foothold Citadel
+515	15	1	world	Kalimdor	Ironclad Prison
+516	15	1	world	Kalimdor	Dustwallow Bay
+517	15	1	world	Kalimdor	Tidefury Cove
+518	15	1	world	Kalimdor	Dreadmurk Shore
+536	10	0	world	Azeroth	Addle's Stead
+537	490	1	world	Kalimdor	Fire Plume Ridge
+538	490	1	world	Kalimdor	Lakkari Tar Pits
+539	490	1	world	Kalimdor	Terror Run
+540	490	1	world	Kalimdor	The Slithering Scar
+541	490	1	world	Kalimdor	Marshal's Refuge
+542	490	1	world	Kalimdor	Fungal Rock
+543	490	1	world	Kalimdor	Golakka Hot Springs
+556	38	0	world	Azeroth	The Loch
+576	10	0	world	Azeroth	Beggar's Haunt
+596	405	1	world	Kalimdor	Kodo Graveyard
+597	405	1	world	Kalimdor	Ghost Walker Post
+598	405	1	world	Kalimdor	Sar'theris Strand
+599	405	1	world	Kalimdor	Thunder Axe Fortress
+600	405	1	world	Kalimdor	Bolgan's Hole
+602	405	1	world	Kalimdor	Mannoroc Coven
+603	405	1	world	Kalimdor	Sargeron
+604	405	1	world	Kalimdor	Magram Village
+606	405	1	world	Kalimdor	Gelkis Village
+607	405	1	world	Kalimdor	Valley of Spears
+608	405	1	world	Kalimdor	Nijel's Point
+609	405	1	world	Kalimdor	Kolkar Village
+616	0	1	world	Kalimdor	Hyjal
+618	0	1	world	Kalimdor	Winterspring
+636	406	1	world	Kalimdor	Blackwolf River
+637	215	1	world	Kalimdor	Kodo Rock
+638	14	1	world	Kalimdor	Hidden Path
+639	14	1	world	Kalimdor	Spirit Rock
+640	14	1	world	Kalimdor	Shrine of the Dormant Flame
+656	493	1	world	Kalimdor	Lake Elune'ara
+657	8	0	world	Azeroth	The Harborage
+676	0	150	-1	?	Outland
+696	141	1	world	Kalimdor	Craftsmen's Terrace UNUSED
+697	141	1	world	Kalimdor	Tradesmen's Terrace UNUSED
+698	141	1	world	Kalimdor	The Temple Gardens UNUSED
+699	141	1	world	Kalimdor	Temple of Elune UNUSED
+700	141	1	world	Kalimdor	Cenarion Enclave UNUSED
+701	141	1	world	Kalimdor	Warrior's Terrace UNUSED
+702	141	1	world	Kalimdor	Rut'theran Village
+716	1	0	world	Azeroth	Ironband's Compound
+717	0	34	dungeon	StormwindJail	The Stockade
+718	0	43	dungeon	WailingCaverns	Wailing Caverns
+719	0	48	dungeon	Blackfathom	Blackfathom Deeps
+720	17	1	world	Kalimdor	Fray Island
+721	0	90	dungeon	GnomeragonInstance	Gnomeregan
+722	0	129	dungeon	RazorfenDowns	Razorfen Downs
+736	141	1	world	Kalimdor	Ban'ethil Hollow
+796	0	189	dungeon	MonasteryInstances	Scarlet Monastery
+797	12	0	world	Azeroth	Jerod's Landing
+798	12	0	world	Azeroth	Ridgepoint Tower
+799	10	0	world	Azeroth	The Darkened Bank
+800	1	0	world	Azeroth	Coldridge Pass
+801	1	0	world	Azeroth	Chill Breeze Valley
+802	1	0	world	Azeroth	Shimmer Ridge
+803	1	0	world	Azeroth	Amberstill Ranch
+804	1	0	world	Azeroth	The Tundrid Hills
+805	1	0	world	Azeroth	South Gate Pass
+806	1	0	world	Azeroth	South Gate Outpost
+807	1	0	world	Azeroth	North Gate Pass
+808	1	0	world	Azeroth	North Gate Outpost
+809	1	0	world	Azeroth	Gates of Ironforge
+810	85	0	world	Azeroth	Stillwater Pond
+811	85	0	world	Azeroth	Nightmare Vale
+812	85	0	world	Azeroth	Venomweb Vale
+813	28	0	world	Azeroth	The Bulwark
+814	14	1	world	Kalimdor	Southfury River
+815	17	1	world	Kalimdor	Southfury River
+816	14	1	world	Kalimdor	Razormane Grounds
+817	14	1	world	Kalimdor	Skull Rock
+818	215	1	world	Kalimdor	Palemane Rock
+819	215	1	world	Kalimdor	Windfury Ridge
+820	215	1	world	Kalimdor	The Golden Plains
+821	215	1	world	Kalimdor	The Rolling Plains
+836	11	0	world	Azeroth	Dun Algaz
+837	38	0	world	Azeroth	Dun Algaz
+838	38	0	world	Azeroth	North Gate Pass
+839	38	0	world	Azeroth	South Gate Pass
+856	10	0	world	Azeroth	Twilight Grove
+876	0	1	world	Kalimdor	GM Island
+877	17	1	world	Kalimdor	Delete ME
+878	16	1	world	Kalimdor	Southfury River
+879	331	1	world	Kalimdor	Southfury River
+880	45	0	world	Azeroth	Thandol Span
+881	11	0	world	Azeroth	Thandol Span
+896	267	0	world	Azeroth	Purgation Isle
+916	40	0	world	Azeroth	The Jansen Stead
+917	40	0	world	Azeroth	The Dead Acre
+918	40	0	world	Azeroth	The Molsen Farm
+919	40	0	world	Azeroth	Stendel's Pond
+920	40	0	world	Azeroth	The Dagger Hills
+921	40	0	world	Azeroth	Demont's Place
+922	40	0	world	Azeroth	The Dust Plains
+923	38	0	world	Azeroth	Stonesplinter Valley
+924	38	0	world	Azeroth	Valley of Kings
+925	38	0	world	Azeroth	Algaz Station
+926	130	0	world	Azeroth	Bucklebree Farm
+927	130	0	world	Azeroth	The Shining Strand
+928	130	0	world	Azeroth	North Tide's Hollow
+936	38	0	world	Azeroth	Grizzlepaw Ridge
+956	0	169	raid	EmeraldDream	The Verdant Fields
+976	440	1	world	Kalimdor	Gadgetzan
+977	440	1	world	Kalimdor	Steamwheedle Port
+978	440	1	world	Kalimdor	Zul'Farrak
+979	440	1	world	Kalimdor	Sandsorrow Watch
+980	440	1	world	Kalimdor	Thistleshrub Valley
+981	440	1	world	Kalimdor	The Gaping Chasm
+982	440	1	world	Kalimdor	The Noxious Lair
+983	440	1	world	Kalimdor	Dunemaul Compound
+984	440	1	world	Kalimdor	Eastmoon Ruins
+985	440	1	world	Kalimdor	Waterspring Field
+986	440	1	world	Kalimdor	Zalashji's Den
+987	440	1	world	Kalimdor	Land's End Beach
+988	440	1	world	Kalimdor	Wavestrider Beach
+989	440	1	world	Kalimdor	Uldum
+990	440	1	world	Kalimdor	Valley of the Watchers
+991	440	1	world	Kalimdor	Gunstan's Post
+992	440	1	world	Kalimdor	Southmoon Ruins
+996	44	0	world	Azeroth	Render's Camp
+997	44	0	world	Azeroth	Render's Valley
+998	44	0	world	Azeroth	Render's Rock
+999	44	0	world	Azeroth	Stonewatch Tower
+1000	44	0	world	Azeroth	Galardell Valley
+1001	44	0	world	Azeroth	Lakeridge Highway
+1002	44	0	world	Azeroth	Three Corners
+1016	11	0	world	Azeroth	Direforge Hill
+1017	11	0	world	Azeroth	Raptor Ridge
+1018	11	0	world	Azeroth	Black Channel Marsh
+1019	139	0	world	Azeroth	The Green Belt
+1020	11	0	world	Azeroth	Mosshide Fen
+1021	11	0	world	Azeroth	Thelgen Rock
+1022	11	0	world	Azeroth	Bluegill Marsh
+1023	11	0	world	Azeroth	Saltspray Glen
+1024	11	0	world	Azeroth	Sundown Marsh
+1025	11	0	world	Azeroth	The Green Belt
+1036	11	0	world	Azeroth	Angerfang Encampment
+1037	11	0	world	Azeroth	Grim Batol
+1038	11	0	world	Azeroth	Dragonmaw Gates
+1039	11	0	world	Azeroth	The Lost Fleet
+1056	267	0	world	Azeroth	Darrow Hill
+1057	267	0	world	Azeroth	Thoradin's Wall
+1076	406	1	world	Kalimdor	Webwinder Path
+1097	10	0	world	Azeroth	The Hushed Bank
+1098	10	0	world	Azeroth	Manor Mistmantle
+1099	357	1	world	Kalimdor	Camp Mojache
+1100	357	1	world	Kalimdor	Grimtotem Compound
+1101	357	1	world	Kalimdor	The Writhing Deep
+1102	357	1	world	Kalimdor	Wildwind Lake
+1103	357	1	world	Kalimdor	Gordunni Outpost
+1104	357	1	world	Kalimdor	Mok'Gordun
+1105	357	1	world	Kalimdor	Feral Scar Vale
+1106	357	1	world	Kalimdor	Frayfeather Highlands
+1107	357	1	world	Kalimdor	Idlewind Lake
+1108	357	1	world	Kalimdor	The Forgotten Coast
+1109	357	1	world	Kalimdor	East Pillar
+1110	357	1	world	Kalimdor	West Pillar
+1111	357	1	world	Kalimdor	Dream Bough
+1112	357	1	world	Kalimdor	Jademir Lake
+1113	357	1	world	Kalimdor	Oneiros
+1114	357	1	world	Kalimdor	Ruins of Ravenwind
+1115	357	1	world	Kalimdor	Rage Scar Hold
+1116	357	1	world	Kalimdor	Feathermoon Stronghold
+1117	357	1	world	Kalimdor	Ruins of Solarsal
+1118	357	1	world	Kalimdor	Lower Wilds UNUSED
+1119	357	1	world	Kalimdor	The Twin Colossals
+1120	357	1	world	Kalimdor	Sardor Isle
+1121	357	1	world	Kalimdor	Isle of Dread
+1136	357	1	world	Kalimdor	High Wilderness
+1137	357	1	world	Kalimdor	Lower Wilds
+1156	17	1	world	Kalimdor	Southern Barrens
+1157	17	1	world	Kalimdor	Southern Gold Road
+1176	0	209	dungeon	TanarisInstance	Zul'Farrak
+1196	0	575	dungeon	UtgardePinnacle	Utgarde Pinnacle
+1216	16	1	world	Kalimdor	Timbermaw Hold
+1217	16	1	world	Kalimdor	Vanndir Encampment
+1218	16	1	world	Kalimdor	TESTAzshara
+1219	16	1	world	Kalimdor	Legash Encampment
+1220	16	1	world	Kalimdor	Thalassian Base Camp
+1221	16	1	world	Kalimdor	Ruins of Eldarath
+1222	16	1	world	Kalimdor	Hetaera's Clutch
+1223	16	1	world	Kalimdor	Temple of Zin-Malor
+1224	16	1	world	Kalimdor	Bear's Head
+1225	16	1	world	Kalimdor	Ursolan
+1226	16	1	world	Kalimdor	Temple of Arkkoran
+1227	16	1	world	Kalimdor	Bay of Storms
+1228	16	1	world	Kalimdor	The Shattered Strand
+1229	16	1	world	Kalimdor	Tower of Eldara
+1230	16	1	world	Kalimdor	Jagged Reef
+1231	16	1	world	Kalimdor	Southridge Beach
+1232	16	1	world	Kalimdor	Ravencrest Monument
+1233	16	1	world	Kalimdor	Forlorn Ridge
+1234	16	1	world	Kalimdor	Lake Mennar
+1235	16	1	world	Kalimdor	Shadowsong Shrine
+1236	16	1	world	Kalimdor	Haldarr Encampment
+1237	16	1	world	Kalimdor	Valormok
+1256	16	1	world	Kalimdor	The Ruined Reaches
+1276	331	1	world	Kalimdor	The Talondeep Path
+1277	406	1	world	Kalimdor	The Talondeep Path
+1296	14	1	world	Kalimdor	Rocktusk Farm
+1297	14	1	world	Kalimdor	Jaggedswine Farm
+1316	17	1	world	Kalimdor	Razorfen Downs
+1336	440	1	world	Kalimdor	Lost Rigger Cove
+1337	0	70	dungeon	Uldaman	Uldaman
+1338	130	0	world	Azeroth	Lordamere Lake
+1339	36	0	world	Azeroth	Lordamere Lake
+1357	36	0	world	Azeroth	Gallows' Corner
+1377	0	1	world	Kalimdor	Silithus
+1397	0	169	raid	EmeraldDream	Emerald Forest
+1417	0	109	dungeon	SunkenTemple	Sunken Temple
+1437	4	0	world	Azeroth	Dreadmaul Hold
+1438	4	0	world	Azeroth	Nethergarde Keep
+1439	4	0	world	Azeroth	Dreadmaul Post
+1440	4	0	world	Azeroth	Serpent's Coil
+1441	4	0	world	Azeroth	Altar of Storms
+1442	51	0	world	Azeroth	Firewatch Ridge
+1443	51	0	world	Azeroth	The Slag Pit
+1444	51	0	world	Azeroth	The Sea of Cinders
+1445	51	0	world	Azeroth	Blackrock Mountain
+1446	51	0	world	Azeroth	Thorium Point
+1457	4	0	world	Azeroth	Garrison Armory
+1477	0	109	dungeon	SunkenTemple	The Temple of Atal'Hakkar
+1497	0	0	world	Azeroth	Undercity
+1517	3	0	world	Azeroth	Uldaman
+1518	40	0	world	Azeroth	Not Used Deadmines
+1519	0	0	world	Azeroth	Stormwind City
+1537	0	0	world	Azeroth	Ironforge
+1557	400	1	world	Kalimdor	Splithoof Hold
+1577	33	0	world	Azeroth	The Cape of Stranglethorn
+1578	33	0	world	Azeroth	Southern Savage Coast
+1579	0	0	world	Azeroth	Unused The Deadmines 002
+1580	1579	0	world	Azeroth	Unused Ironclad Cove 003
+1581	0	36	dungeon	DeadminesInstance	The Deadmines
+1582	1581	36	dungeon	DeadminesInstance	Ironclad Cove
+1583	0	229	dungeon	BlackRockSpire	Blackrock Spire
+1584	0	230	dungeon	BlackrockDepths	Blackrock Depths
+1597	17	1	world	Kalimdor	Raptor Grounds UNUSED
+1598	17	1	world	Kalimdor	Grol'dom Farm UNUSED
+1599	17	1	world	Kalimdor	Mor'shan Base Camp
+1600	17	1	world	Kalimdor	Honor's Stand UNUSED
+1601	17	1	world	Kalimdor	Blackthorn Ridge UNUSED
+1602	17	1	world	Kalimdor	Bramblescar UNUSED
+1603	17	1	world	Kalimdor	Agama'gor UNUSED
+1617	1519	0	world	Azeroth	Valley of Heroes
+1637	0	1	world	Kalimdor	Orgrimmar
+1638	0	1	world	Kalimdor	Thunder Bluff
+1639	1638	1	world	Kalimdor	Elder Rise
+1640	1638	1	world	Kalimdor	Spirit Rise
+1641	1638	1	world	Kalimdor	Hunter Rise
+1657	0	1	world	Kalimdor	Darnassus
+1658	1657	1	world	Kalimdor	Cenarion Enclave
+1659	1657	1	world	Kalimdor	Craftsmen's Terrace
+1660	1657	1	world	Kalimdor	Warrior's Terrace
+1661	1657	1	world	Kalimdor	The Temple Gardens
+1662	1657	1	world	Kalimdor	Tradesmen's Terrace
+1677	36	0	world	Azeroth	Gavin's Naze
+1678	36	0	world	Azeroth	Sofera's Naze
+1679	36	0	world	Azeroth	Corrahn's Dagger
+1680	36	0	world	Azeroth	The Headland
+1681	36	0	world	Azeroth	Misty Shore
+1682	36	0	world	Azeroth	Dandred's Fold
+1683	36	0	world	Azeroth	Growless Cave
+1684	36	0	world	Azeroth	Chillwind Point
+1697	17	1	world	Kalimdor	Raptor Grounds
+1698	17	1	world	Kalimdor	Bramblescar
+1699	17	1	world	Kalimdor	Thorn Hill
+1700	17	1	world	Kalimdor	Agama'gor
+1701	17	1	world	Kalimdor	Blackthorn Ridge
+1702	17	1	world	Kalimdor	Honor's Stand
+1703	17	1	world	Kalimdor	The Mor'shan Rampart
+1704	17	1	world	Kalimdor	Grol'dom Farm
+1717	17	1	world	Kalimdor	Razorfen Kraul
+1718	17	1	world	Kalimdor	The Great Lift
+1737	33	0	world	Azeroth	Mistvale Valley
+1738	33	0	world	Azeroth	Nek'mani Wellspring
+1739	33	0	world	Azeroth	Bloodsail Compound
+1740	33	0	world	Azeroth	Venture Co. Base Camp
+1741	33	0	world	Azeroth	Gurubashi Arena
+1742	33	0	world	Azeroth	Spirit Den
+1757	33	0	world	Azeroth	The Crimson Veil
+1758	33	0	world	Azeroth	The Riptide
+1759	33	0	world	Azeroth	The Damsel's Luck
+1760	33	0	world	Azeroth	Venture Co. Operations Center
+1761	361	1	world	Kalimdor	Deadwood Village
+1762	361	1	world	Kalimdor	Felpaw Village
+1763	361	1	world	Kalimdor	Jaedenar
+1764	361	1	world	Kalimdor	Bloodvenom River
+1765	361	1	world	Kalimdor	Bloodvenom Falls
+1766	361	1	world	Kalimdor	Shatter Scar Vale
+1767	361	1	world	Kalimdor	Irontree Woods
+1768	361	1	world	Kalimdor	Irontree Cavern
+1769	361	1	world	Kalimdor	Timbermaw Hold
+1770	361	1	world	Kalimdor	Shadow Hold
+1771	361	1	world	Kalimdor	Shrine of the Deceiver
+1777	8	0	world	Azeroth	Itharius's Cave
+1778	8	0	world	Azeroth	Sorrowmurk
+1779	8	0	world	Azeroth	Draenil'dur Village
+1780	8	0	world	Azeroth	Splinterspear Junction
+1797	8	0	world	Azeroth	Stagalbog
+1798	8	0	world	Azeroth	The Shifting Mire
+1817	8	0	world	Azeroth	Stagalbog Cave
+1837	45	0	world	Azeroth	Witherbark Caverns
+1857	45	0	world	Azeroth	Thoradin's Wall
+1858	45	0	world	Azeroth	Boulder'gor
+1877	3	0	world	Azeroth	Valley of Fangs
+1878	3	0	world	Azeroth	The Dustbowl
+1879	3	0	world	Azeroth	Mirage Flats
+1880	47	0	world	Azeroth	Featherbeard's Hovel
+1881	47	0	world	Azeroth	Shindigger's Camp
+1882	47	0	world	Azeroth	Plaguemist Ravine
+1883	47	0	world	Azeroth	Valorwind Lake
+1884	47	0	world	Azeroth	Agol'watha
+1885	47	0	world	Azeroth	Hiri'watha
+1886	47	0	world	Azeroth	The Creeping Ruin
+1887	47	0	world	Azeroth	Bogen's Ledge
+1897	3	0	world	Azeroth	The Maker's Terrace
+1898	3	0	world	Azeroth	Dustwind Gulch
+1917	47	0	world	Azeroth	Shaol'watha
+1937	440	1	world	Kalimdor	Noonshade Ruins
+1938	440	1	world	Kalimdor	Broken Pillar
+1939	440	1	world	Kalimdor	Abyssal Sands
+1940	440	1	world	Kalimdor	Southbreak Shore
+1941	0	1	world	Kalimdor	Caverns of Time
+1942	490	1	world	Kalimdor	The Marshlands
+1943	490	1	world	Kalimdor	Ironstone Plateau
+1957	51	0	world	Azeroth	Blackchar Cave
+1958	51	0	world	Azeroth	Tanner Camp
+1959	51	0	world	Azeroth	Dustfire Valley
+1977	0	309	raid	Zul'gurub	Zul'Gurub
+1978	8	0	world	Azeroth	Misty Reed Post
+1997	361	1	world	Kalimdor	Bloodvenom Post
+1998	361	1	world	Kalimdor	Talonbranch Glade
+2017	0	329	dungeon	Stratholme	Stratholme
+2037	0	0	world	Azeroth	Quel'thalas
+2057	0	289	dungeon	SchoolofNecromancy	Scholomance
+2077	148	1	world	Kalimdor	Twilight Vale
+2078	148	1	world	Kalimdor	Twilight Shore
+2079	15	1	world	Kalimdor	Alcaz Island
+2097	400	1	world	Kalimdor	Darkcloud Pinnacle
+2098	10	0	world	Azeroth	Dawning Wood Catacombs
+2099	44	0	world	Azeroth	Stonewatch Keep
+2100	0	349	dungeon	Mauradon	Maraudon
+2101	38	0	world	Azeroth	Stoutlager Inn
+2102	1	0	world	Azeroth	Thunderbrew Distillery
+2103	11	0	world	Azeroth	Menethil Keep
+2104	11	0	world	Azeroth	Deepwater Tavern
+2117	85	0	world	Azeroth	Shadow Grave
+2118	85	0	world	Azeroth	Brill Town Hall
+2119	85	0	world	Azeroth	Gallows' End Tavern
+2137	215	1	world	Kalimdor	The Pools of VisionUNUSED
+2138	17	1	world	Kalimdor	Dreadmist Den
+2157	17	1	world	Kalimdor	Bael'dun Keep
+2158	15	1	world	Kalimdor	Emberstrife's Den
+2159	0	1	world	Kalimdor	Onyxia's Lair
+2160	406	1	world	Kalimdor	Windshear Mine
+2161	10	0	world	Azeroth	Roland's Doom
+2177	33	0	world	Azeroth	Battle Ring
+2197	1638	1	world	Kalimdor	The Pools of Vision
+2198	405	1	world	Kalimdor	Shadowbreak Ravine
+2217	405	1	world	Kalimdor	Broken Spear Village
+2237	400	1	world	Kalimdor	Whitereach Post
+2238	400	1	world	Kalimdor	Gornia
+2239	400	1	world	Kalimdor	Zane's Eye Crater
+2240	400	1	world	Kalimdor	Mirage Raceway
+2241	618	1	world	Kalimdor	Frostsaber Rock
+2242	618	1	world	Kalimdor	The Hidden Grove
+2243	618	1	world	Kalimdor	Timbermaw Post
+2244	618	1	world	Kalimdor	Winterfall Village
+2245	618	1	world	Kalimdor	Mazthoril
+2246	618	1	world	Kalimdor	Frostfire Hot Springs
+2247	618	1	world	Kalimdor	Ice Thistle Hills
+2248	618	1	world	Kalimdor	Dun Mandarr
+2249	618	1	world	Kalimdor	Frostwhisper Gorge
+2250	618	1	world	Kalimdor	Owl Wing Thicket
+2251	618	1	world	Kalimdor	Lake Kel'Theril
+2252	618	1	world	Kalimdor	The Ruins of Kel'Theril
+2253	618	1	world	Kalimdor	Starfall Village
+2254	618	1	world	Kalimdor	Ban'Thallow Barrow Den
+2255	618	1	world	Kalimdor	Everlook
+2256	618	1	world	Kalimdor	Darkwhisper Gorge
+2257	0	369	world	DeeprunTram	Deeprun Tram
+2258	139	0	world	Azeroth	The Fungal Vale
+2259	139	0	world	Azeroth	UNUSEDThe Marris Stead
+2260	139	0	world	Azeroth	The Marris Stead
+2261	139	0	world	Azeroth	The Undercroft
+2262	139	0	world	Azeroth	Darrowshire
+2263	139	0	world	Azeroth	Crown Guard Tower
+2264	139	0	world	Azeroth	Corin's Crossing
+2265	139	0	world	Azeroth	Scarlet Base Camp
+2266	139	0	world	Azeroth	Tyr's Hand
+2267	139	0	world	Azeroth	The Scarlet Basilica
+2268	139	0	world	Azeroth	Light's Hope Chapel
+2269	139	0	world	Azeroth	Browman Mill
+2270	139	0	world	Azeroth	The Noxious Glade
+2271	139	0	world	Azeroth	Eastwall Tower
+2272	139	0	world	Azeroth	Northdale
+2273	139	0	world	Azeroth	Zul'Mashar
+2274	139	0	world	Azeroth	Mazra'Alor
+2275	139	0	world	Azeroth	Northpass Tower
+2276	139	0	world	Azeroth	Quel'Lithien Lodge
+2277	139	0	world	Azeroth	Plaguewood
+2278	139	0	world	Azeroth	Scourgehold
+2279	139	0	world	Azeroth	Stratholme
+2280	0	0	world	Azeroth	DO NOT USE
+2297	28	0	world	Azeroth	Darrowmere Lake
+2298	28	0	world	Azeroth	Caer Darrow
+2299	139	0	world	Azeroth	Darrowmere Lake
+2300	440	1	world	Kalimdor	Caverns of Time
+2301	331	1	world	Kalimdor	Thistlefur Village
+2302	15	1	world	Kalimdor	The Quagmire
+2303	400	1	world	Kalimdor	Windbreak Canyon
+2317	440	1	world	Kalimdor	South Seas
+2318	15	1	world	Kalimdor	The Great Sea
+2319	17	1	world	Kalimdor	The Great Sea
+2320	14	1	world	Kalimdor	The Great Sea
+2321	16	1	world	Kalimdor	The Great Sea
+2322	141	1	world	Kalimdor	The Veiled Sea
+2323	357	1	world	Kalimdor	The Veiled Sea
+2324	405	1	world	Kalimdor	The Veiled Sea
+2325	331	1	world	Kalimdor	The Veiled Sea
+2326	148	1	world	Kalimdor	The Veiled Sea
+2337	14	1	world	Kalimdor	Razor Hill Barracks
+2338	33	0	world	Azeroth	South Seas
+2339	33	0	world	Azeroth	The Great Sea
+2357	331	1	world	Kalimdor	Bloodtooth Camp
+2358	331	1	world	Kalimdor	Forest Song
+2359	331	1	world	Kalimdor	Greenpaw Village
+2360	331	1	world	Kalimdor	Silverwing Outpost
+2361	493	1	world	Kalimdor	Nighthaven
+2362	493	1	world	Kalimdor	Shrine of Remulos
+2363	493	1	world	Kalimdor	Stormrage Barrow Dens
+2364	40	0	world	Azeroth	The Great Sea
+2365	11	0	world	Azeroth	The Great Sea
+2366	0	269	dungeon	CavernsOfTime	The Black Morass
+2367	0	560	dungeon	HillsbradPast	Old Hillsbrad Foothills
+2368	2367	560	dungeon	HillsbradPast	Tarren Mill
+2369	2367	560	dungeon	HillsbradPast	Southshore
+2370	2367	560	dungeon	HillsbradPast	Durnholde Keep
+2371	2367	560	dungeon	HillsbradPast	Dun Garok
+2372	2367	560	dungeon	HillsbradPast	Hillsbrad Fields
+2373	2367	560	dungeon	HillsbradPast	Eastern Strand
+2374	2367	560	dungeon	HillsbradPast	Nethander Stead
+2375	2367	560	dungeon	HillsbradPast	Darrow Hill
+2376	2367	560	dungeon	HillsbradPast	Southpoint Tower
+2377	2367	560	dungeon	HillsbradPast	Thoradin's Wall
+2378	2367	560	dungeon	HillsbradPast	Western Strand
+2379	2367	560	dungeon	HillsbradPast	Azurelode Mine
+2397	267	0	world	Azeroth	The Great Sea
+2398	130	0	world	Azeroth	The Great Sea
+2399	85	0	world	Azeroth	The Great Sea
+2400	47	0	world	Azeroth	The Forbidding Sea
+2401	45	0	world	Azeroth	The Forbidding Sea
+2402	11	0	world	Azeroth	The Forbidding Sea
+2403	8	0	world	Azeroth	The Forbidding Sea
+2404	405	1	world	Kalimdor	Tethris Aran
+2405	405	1	world	Kalimdor	Ethel Rethor
+2406	405	1	world	Kalimdor	Ranazjar Isle
+2407	405	1	world	Kalimdor	Kormek's Hut
+2408	405	1	world	Kalimdor	Shadowprey Village
+2417	46	0	world	Azeroth	Blackrock Pass
+2418	46	0	world	Azeroth	Morgan's Vigil
+2419	46	0	world	Azeroth	Slither Rock
+2420	46	0	world	Azeroth	Terror Wing Path
+2421	46	0	world	Azeroth	Draco'dar
+2437	0	389	dungeon	OrgrimmarInstance	Ragefire Chasm
+2457	331	1	world	Kalimdor	Nightsong Woods
+2477	1377	1	world	Kalimdor	The Veiled Sea
+2478	361	1	world	Kalimdor	Morlos'Aran
+2479	361	1	world	Kalimdor	Emerald Sanctuary
+2480	361	1	world	Kalimdor	Jadefire Glen
+2481	361	1	world	Kalimdor	Ruins of Constellas
+2497	16	1	world	Kalimdor	Bitter Reaches
+2517	4	0	world	Azeroth	Rise of the Defiler
+2518	357	1	world	Kalimdor	Lariss Pavilion
+2519	357	1	world	Kalimdor	Woodpaw Hills
+2520	357	1	world	Kalimdor	Woodpaw Den
+2521	357	1	world	Kalimdor	Verdantis River
+2522	357	1	world	Kalimdor	Ruins of Isildien
+2537	406	1	world	Kalimdor	Grimtotem Post
+2538	406	1	world	Kalimdor	Camp Aparaje
+2539	406	1	world	Kalimdor	Malaka'jin
+2540	406	1	world	Kalimdor	Boulderslide Ravine
+2541	406	1	world	Kalimdor	Sishir Canyon
+2557	0	429	dungeon	DireMaul	Dire Maul
+2558	41	0	world	Azeroth	Deadwind Ravine
+2559	41	0	world	Azeroth	Diamondhead River
+2560	41	0	world	Azeroth	Ariden's Camp
+2561	41	0	world	Azeroth	The Vice
+2562	41	0	world	Azeroth	Karazhan
+2563	41	0	world	Azeroth	Morgan's Plot
+2577	357	1	world	Kalimdor	Dire Maul
+2597	0	30	battleground	PVPZone01	Alterac Valley
+2617	405	1	world	Kalimdor	Scrabblescrew's Camp
+2618	361	1	world	Kalimdor	Jadefire Run
+2619	139	0	world	Azeroth	Thondroril River
+2620	28	0	world	Azeroth	Thondroril River
+2621	139	0	world	Azeroth	Lake Mereldar
+2622	139	0	world	Azeroth	Pestilent Scar
+2623	139	0	world	Azeroth	The Infectis Scar
+2624	139	0	world	Azeroth	Blackwood Lake
+2625	139	0	world	Azeroth	Eastwall Gate
+2626	139	0	world	Azeroth	Terrorweb Tunnel
+2627	139	0	world	Azeroth	Terrordale
+2637	331	1	world	Kalimdor	Kargathia Keep
+2657	405	1	world	Kalimdor	Valley of Bones
+2677	0	469	raid	BlackwingLair	Blackwing Lair
+2697	41	0	world	Azeroth	Deadman's Crossing
+2717	0	409	raid	MoltenCore	Molten Core
+2737	1377	1	world	Kalimdor	The Scarab Wall
+2738	1377	1	world	Kalimdor	Southwind Village
+2739	1377	1	world	Kalimdor	Twilight Base Camp
+2740	1377	1	world	Kalimdor	The Crystal Vale
+2741	1377	1	world	Kalimdor	The Scarab Dais
+2742	1377	1	world	Kalimdor	Hive'Ashi
+2743	1377	1	world	Kalimdor	Hive'Zora
+2744	1377	1	world	Kalimdor	Hive'Regal
+2757	17	1	world	Kalimdor	Shrine of the Fallen Warrior
+2777	267	0	world	Azeroth	UNUSED Alterac Valley
+2797	331	1	world	Kalimdor	Blackfathom Deeps
+2817	0	571	world	Northrend	Crystalsong Forest
+2837	41	0	world	Azeroth	The Master's Cellar
+2838	51	0	world	Azeroth	Stonewrought Pass
+2839	36	0	world	Azeroth	Alterac Valley
+2857	440	1	world	Kalimdor	The Rumble Cage
+2877	22	451	world	development	Chunk Test
+2897	331	1	world	Kalimdor	Zoram'gar Outpost
+2917	0	1	world	Kalimdor	Hall of Legends
+2918	0	449	world	AlliancePVPBarracks	Champions' Hall
+2937	41	0	world	Azeroth	Grosh'gok Compound
+2938	41	0	world	Azeroth	Sleeping Gorge
+2957	2597	30	battleground	PVPZone01	Irondeep Mine
+2958	2597	30	battleground	PVPZone01	Stonehearth Outpost
+2959	2597	30	battleground	PVPZone01	Dun Baldar
+2960	2597	30	battleground	PVPZone01	Icewing Pass
+2961	2597	30	battleground	PVPZone01	Frostwolf Village
+2962	2597	30	battleground	PVPZone01	Tower Point
+2963	2597	30	battleground	PVPZone01	Coldtooth Mine
+2964	2597	30	battleground	PVPZone01	Winterax Hold
+2977	2597	30	battleground	PVPZone01	Iceblood Garrison
+2978	2597	30	battleground	PVPZone01	Frostwolf Keep
+2979	14	1	world	Kalimdor	Tor'kren Farm
+3017	2597	30	battleground	PVPZone01	Frost Dagger Pass
+3037	400	1	world	Kalimdor	Ironstone Camp
+3038	400	1	world	Kalimdor	Weazel's Crater
+3039	400	1	world	Kalimdor	Tahonda Ruins
+3057	2597	30	battleground	PVPZone01	Field of Strife
+3058	2597	30	battleground	PVPZone01	Icewing Cavern
+3077	1377	1	world	Kalimdor	Valor's Rest
+3097	1377	1	world	Kalimdor	The Swarming Pillar
+3098	1377	1	world	Kalimdor	Twilight Post
+3099	1377	1	world	Kalimdor	Twilight Outpost
+3100	1377	1	world	Kalimdor	Ravaged Twilight Camp
+3117	357	1	world	Kalimdor	Shalzaru's Lair
+3137	16	1	world	Kalimdor	Talrendis Point
+3138	16	1	world	Kalimdor	Rethress Sanctum
+3139	618	1	world	Kalimdor	Moon Horror Den
+3140	16	1	world	Kalimdor	Scalebeard's Cave
+3157	406	1	world	Kalimdor	Boulderslide Cavern
+3177	331	1	world	Kalimdor	Warsong Labor Camp
+3197	28	0	world	Azeroth	Chillwind Camp
+3217	2557	429	dungeon	DireMaul	The Maul
+3237	2557	429	dungeon	DireMaul	The Maul UNUSED
+3257	1377	1	world	Kalimdor	Bones of Grakkarond
+3277	0	489	battleground	PVPZone03	Warsong Gulch
+3297	2597	30	battleground	PVPZone01	Frostwolf Graveyard
+3298	2597	30	battleground	PVPZone01	Frostwolf Pass
+3299	2597	30	battleground	PVPZone01	Dun Baldar Pass
+3300	2597	30	battleground	PVPZone01	Iceblood Graveyard
+3301	2597	30	battleground	PVPZone01	Snowfall Graveyard
+3302	2597	30	battleground	PVPZone01	Stonehearth Graveyard
+3303	2597	30	battleground	PVPZone01	Stormpike Graveyard
+3304	2597	30	battleground	PVPZone01	Icewing Bunker
+3305	2597	30	battleground	PVPZone01	Stonehearth Bunker
+3306	2597	30	battleground	PVPZone01	Wildpaw Ridge
+3317	47	0	world	Azeroth	Revantusk Village
+3318	2597	30	battleground	PVPZone01	Rock of Durotan
+3319	331	1	world	Kalimdor	Silverwing Grove
+3320	3277	489	battleground	PVPZone03	Warsong Lumber Mill
+3321	3277	489	battleground	PVPZone03	Silverwing Hold
+3337	2597	30	battleground	PVPZone01	Wildpaw Cavern
+3338	2597	30	battleground	PVPZone01	The Veiled Cleft
+3357	33	0	world	Azeroth	Yojamba Isle
+3358	0	529	battleground	PVPZone04	Arathi Basin
+3377	1977	309	raid	Zul'gurub	The Coil
+3378	1977	309	raid	Zul'gurub	Altar of Hir'eek
+3379	1977	309	raid	Zul'gurub	Shadra'zaar
+3380	1977	309	raid	Zul'gurub	Hakkari Grounds
+3381	1977	309	raid	Zul'gurub	Naze of Shirvallah
+3382	1977	309	raid	Zul'gurub	Temple of Bethekk
+3383	1977	309	raid	Zul'gurub	The Bloodfire Pit
+3384	1977	309	raid	Zul'gurub	Altar of the Blood God
+3397	1977	309	raid	Zul'gurub	Zanza's Rise
+3398	1977	309	raid	Zul'gurub	Edge of Madness
+3417	3358	529	battleground	PVPZone04	Trollbane Hall
+3418	3358	529	battleground	PVPZone04	Defiler's Den
+3419	1977	309	raid	Zul'gurub	Pagle's Pointe
+3420	3358	529	battleground	PVPZone04	Farm
+3421	3358	529	battleground	PVPZone04	Blacksmith
+3422	3358	529	battleground	PVPZone04	Lumber Mill
+3423	3358	529	battleground	PVPZone04	Gold Mine
+3424	3358	529	battleground	PVPZone04	Stables
+3425	1377	1	world	Kalimdor	Cenarion Hold
+3426	1377	1	world	Kalimdor	Staghelm Point
+3427	1377	1	world	Kalimdor	Bronzebeard Encampment
+3428	0	531	raid	AhnQirajTemple	Ahn'Qiraj
+3429	0	509	raid	AhnQiraj	Ruins of Ahn'Qiraj
+3430	0	530	world	Expansion01	Eversong Woods
+3431	3430	530	world	Expansion01	Sunstrider Isle
+3432	3430	530	world	Expansion01	Shrine of Dath'Remar
+3433	0	530	world	Expansion01	Ghostlands
+3434	3428	531	raid	AhnQirajTemple	Scarab Terrace
+3435	3428	531	raid	AhnQirajTemple	General's Terrace
+3436	3428	531	raid	AhnQirajTemple	The Reservoir
+3437	3428	531	raid	AhnQirajTemple	The Hatchery
+3438	3428	531	raid	AhnQirajTemple	The Comb
+3439	3428	531	raid	AhnQirajTemple	Watchers' Terrace
+3440	3429	509	raid	AhnQiraj	Scarab Terrace
+3441	3429	509	raid	AhnQiraj	General's Terrace
+3442	3429	509	raid	AhnQiraj	The Reservoir
+3443	3429	509	raid	AhnQiraj	The Hatchery
+3444	3429	509	raid	AhnQiraj	The Comb
+3445	3429	509	raid	AhnQiraj	Watchers' Terrace
+3446	1377	1	world	Kalimdor	Twilight's Run
+3447	1377	1	world	Kalimdor	Ortell's Hideout
+3448	3429	509	raid	AhnQiraj	Scarab Terrace
+3449	3429	509	raid	AhnQiraj	General's Terrace
+3450	3429	509	raid	AhnQiraj	The Reservoir
+3451	3429	509	raid	AhnQiraj	The Hatchery
+3452	3429	509	raid	AhnQiraj	The Comb
+3453	3429	509	raid	AhnQiraj	Watchers' Terrace
+3454	1377	1	world	Kalimdor	Ruins of Ahn'Qiraj
+3455	0	530	world	Expansion01	The North Sea
+3456	0	533	raid	Stratholme Raid	Naxxramas
+3457	0	532	raid	Karazahn	Karazhan
+3459	0	0	world	Azeroth	City
+3460	3430	530	world	Expansion01	Golden Strand
+3461	3430	530	world	Expansion01	Sunsail Anchorage
+3462	3430	530	world	Expansion01	Fairbreeze Village
+3463	3430	530	world	Expansion01	Magisters Gate
+3464	3430	530	world	Expansion01	Farstrider Retreat
+3465	3430	530	world	Expansion01	North Sanctum
+3466	3430	530	world	Expansion01	West Sanctum
+3467	3430	530	world	Expansion01	East Sanctum
+3468	3430	530	world	Expansion01	Saltheril's Haven
+3469	3430	530	world	Expansion01	Thuron's Livery
+3470	3430	530	world	Expansion01	Stillwhisper Pond
+3471	3430	530	world	Expansion01	The Living Wood
+3472	3430	530	world	Expansion01	Azurebreeze Coast
+3473	3430	530	world	Expansion01	Lake Elrendar
+3474	3430	530	world	Expansion01	The Scorched Grove
+3475	3430	530	world	Expansion01	Zeb'Watha
+3476	3430	530	world	Expansion01	Tor'Watha
+3477	0	571	world	Northrend	Azjol-Nerub
+3478	0	1	world	Kalimdor	Gates of Ahn'Qiraj
+3479	0	530	world	Expansion01	The Veiled Sea
+3480	3430	530	world	Expansion01	Duskwither Grounds
+3481	3430	530	world	Expansion01	Duskwither Spire
+3482	3430	530	world	Expansion01	The Dead Scar
+3483	0	530	world	Expansion01	Hellfire Peninsula
+3484	3430	530	world	Expansion01	The Sunspire
+3485	3430	530	world	Expansion01	Falthrien Academy
+3486	36	0	world	Azeroth	Ravenholdt Manor
+3487	0	530	world	Expansion01	Silvermoon City
+3488	3433	530	world	Expansion01	Tranquillien
+3489	3433	530	world	Expansion01	Suncrown Village
+3490	3433	530	world	Expansion01	Goldenmist Village
+3491	3433	530	world	Expansion01	Windrunner Village
+3492	3433	530	world	Expansion01	Windrunner Spire
+3493	3433	530	world	Expansion01	Sanctum of the Sun
+3494	3433	530	world	Expansion01	Sanctum of the Moon
+3495	3433	530	world	Expansion01	Dawnstar Spire
+3496	3433	530	world	Expansion01	Farstrider Enclave
+3497	3433	530	world	Expansion01	An'daroth
+3498	3433	530	world	Expansion01	An'telas
+3499	3433	530	world	Expansion01	An'owyn
+3500	3433	530	world	Expansion01	Deatholme
+3501	3433	530	world	Expansion01	Bleeding Ziggurat
+3502	3433	530	world	Expansion01	Howling Ziggurat
+3503	3433	530	world	Expansion01	Shalandis Isle
+3504	3433	530	world	Expansion01	Toryl Estate
+3505	3433	530	world	Expansion01	Underlight Mines
+3506	3433	530	world	Expansion01	Andilien Estate
+3507	3433	530	world	Expansion01	Hatchet Hills
+3508	3433	530	world	Expansion01	Amani Pass
+3509	3433	530	world	Expansion01	Sungraze Peak
+3510	3433	530	world	Expansion01	Amani Catacombs
+3511	3433	530	world	Expansion01	Tower of the Damned
+3512	3433	530	world	Expansion01	Zeb'Sora
+3513	3433	530	world	Expansion01	Lake Elrendar
+3514	3433	530	world	Expansion01	The Dead Scar
+3515	3433	530	world	Expansion01	Elrendar River
+3516	3433	530	world	Expansion01	Zeb'Tela
+3517	3433	530	world	Expansion01	Zeb'Nowa
+3518	0	530	world	Expansion01	Nagrand
+3519	0	530	world	Expansion01	Terokkar Forest
+3520	0	530	world	Expansion01	Shadowmoon Valley
+3521	0	530	world	Expansion01	Zangarmarsh
+3522	0	530	world	Expansion01	Blade's Edge Mountains
+3523	0	530	world	Expansion01	Netherstorm
+3524	0	530	world	Expansion01	Azuremyst Isle
+3525	0	530	world	Expansion01	Bloodmyst Isle
+3526	3524	530	world	Expansion01	Ammen Vale
+3527	3524	530	world	Expansion01	Crash Site
+3528	3524	530	world	Expansion01	Silverline Lake
+3529	3524	530	world	Expansion01	Nestlewood Thicket
+3530	3524	530	world	Expansion01	Shadow Ridge
+3531	3430	530	world	Expansion01	Skulking Row
+3532	3430	530	world	Expansion01	Dawning Lane
+3533	3430	530	world	Expansion01	Ruins of Silvermoon
+3534	3430	530	world	Expansion01	Feth's Way
+3535	0	540	dungeon	HellfireMilitary	Hellfire Citadel
+3536	3483	530	world	Expansion01	Thrallmar
+3537	0	571	world	Northrend	Borean Tundra
+3538	3483	530	world	Expansion01	Honor Hold
+3539	3483	530	world	Expansion01	The Stair of Destiny
+3540	0	530	world	Expansion01	Twisting Nether
+3541	3483	530	world	Expansion01	Forge Camp: Mageddon
+3542	3483	530	world	Expansion01	The Path of Glory
+3543	3483	530	world	Expansion01	The Great Fissure
+3544	3483	530	world	Expansion01	Plain of Shards
+3545	3483	530	world	Expansion01	Hellfire Citadel
+3546	3483	530	world	Expansion01	Expedition Armory
+3547	3483	530	world	Expansion01	Throne of Kil'jaeden
+3548	3483	530	world	Expansion01	Forge Camp: Rage
+3549	3483	530	world	Expansion01	Invasion Point: Annihilator
+3550	3483	530	world	Expansion01	Borune Ruins
+3551	3483	530	world	Expansion01	Ruins of Sha'naar
+3552	3483	530	world	Expansion01	Temple of Telhamat
+3553	3483	530	world	Expansion01	Pools of Aggonar
+3554	3483	530	world	Expansion01	Falcon Watch
+3555	3483	530	world	Expansion01	Mag'har Post
+3556	3483	530	world	Expansion01	Den of Haal'esh
+3557	0	530	world	Expansion01	The Exodar
+3558	3430	530	world	Expansion01	Elrendar Falls
+3559	3524	530	world	Expansion01	Nestlewood Hills
+3560	3524	530	world	Expansion01	Ammen Fields
+3561	3524	530	world	Expansion01	The Sacred Grove
+3562	0	543	dungeon	HellfireRampart	Hellfire Ramparts
+3563	3562	543	dungeon	HellfireRampart	Hellfire Citadel
+3564	3524	530	world	Expansion01	Emberglade
+3565	3521	530	world	Expansion01	Cenarion Refuge
+3566	3524	530	world	Expansion01	Moonwing Den
+3567	3524	530	world	Expansion01	Pod Cluster
+3568	3524	530	world	Expansion01	Pod Wreckage
+3569	3524	530	world	Expansion01	Tides' Hollow
+3570	3524	530	world	Expansion01	Wrathscale Point
+3571	3524	530	world	Expansion01	Bristlelimb Village
+3572	3524	530	world	Expansion01	Stillpine Hold
+3573	3524	530	world	Expansion01	Odesyus' Landing
+3574	3524	530	world	Expansion01	Valaar's Berth
+3575	3524	530	world	Expansion01	Silting Shore
+3576	3524	530	world	Expansion01	Azure Watch
+3577	3524	530	world	Expansion01	Geezle's Camp
+3578	3524	530	world	Expansion01	Menagerie Wreckage
+3579	3524	530	world	Expansion01	Traitor's Cove
+3580	3524	530	world	Expansion01	Wildwind Peak
+3581	3524	530	world	Expansion01	Wildwind Path
+3582	3483	530	world	Expansion01	Zeth'Gor
+3583	3525	530	world	Expansion01	Beryl Coast
+3584	3525	530	world	Expansion01	Blood Watch
+3585	3525	530	world	Expansion01	Bladewood
+3586	3525	530	world	Expansion01	The Vector Coil
+3587	3525	530	world	Expansion01	The Warp Piston
+3588	3525	530	world	Expansion01	The Cryo-Core
+3589	3525	530	world	Expansion01	The Crimson Reach
+3590	3525	530	world	Expansion01	Wrathscale Lair
+3591	3525	530	world	Expansion01	Ruins of Loreth'Aran
+3592	3525	530	world	Expansion01	Nazzivian
+3593	3525	530	world	Expansion01	Axxarien
+3594	3525	530	world	Expansion01	Blacksilt Shore
+3595	3525	530	world	Expansion01	The Foul Pool
+3596	3525	530	world	Expansion01	The Hidden Reef
+3597	3525	530	world	Expansion01	Amberweb Pass
+3598	3525	530	world	Expansion01	Wyrmscar Island
+3599	3525	530	world	Expansion01	Talon Stand
+3600	3525	530	world	Expansion01	Bristlelimb Enclave
+3601	3525	530	world	Expansion01	Ragefeather Ridge
+3602	3525	530	world	Expansion01	Kessel's Crossing
+3603	3525	530	world	Expansion01	Tel'athion's Camp
+3604	3525	530	world	Expansion01	The Bloodcursed Reef
+3605	0	560	dungeon	HillsbradPast	Hyjal Past
+3606	0	534	raid	HyjalPast	Hyjal Summit
+3607	0	548	raid	CoilfangRaid	Serpentshrine Cavern
+3608	3525	530	world	Expansion01	Vindicator's Rest
+3609	3518	530	world	Expansion01	Unused3
+3610	3518	530	world	Expansion01	Burning Blade Ruins
+3611	3518	530	world	Expansion01	Clan Watch
+3612	3525	530	world	Expansion01	Bloodcurse Isle
+3613	3518	530	world	Expansion01	Garadar
+3614	3518	530	world	Expansion01	Skysong Lake
+3615	3518	530	world	Expansion01	Throne of the Elements
+3616	3518	530	world	Expansion01	Laughing Skull Ruins
+3617	3518	530	world	Expansion01	Warmaul Hill
+3618	3518	530	world	Expansion01	Gruul's Lair
+3619	3518	530	world	Expansion01	Auren Ridge
+3620	3518	530	world	Expansion01	Auren Falls
+3621	3518	530	world	Expansion01	Lake Sunspring
+3622	3518	530	world	Expansion01	Sunspring Post
+3623	3518	530	world	Expansion01	Aeris Landing
+3624	3518	530	world	Expansion01	Forge Camp: Fear
+3625	3518	530	world	Expansion01	Forge Camp: Hate
+3626	3518	530	world	Expansion01	Telaar
+3627	3518	530	world	Expansion01	Northwind Cleft
+3628	3518	530	world	Expansion01	Halaa
+3629	3518	530	world	Expansion01	Southwind Cleft
+3630	3518	530	world	Expansion01	Oshu'gun
+3631	3518	530	world	Expansion01	Spirit Fields
+3632	3518	530	world	Expansion01	Shamanar
+3633	3518	530	world	Expansion01	Ancestral Grounds
+3634	3518	530	world	Expansion01	Windyreed Village
+3635	3518	530	world	Expansion01	Unused2
+3636	3518	530	world	Expansion01	Elemental Plateau
+3637	3518	530	world	Expansion01	Kil'sorrow Fortress
+3638	3518	530	world	Expansion01	The Ring of Trials
+3639	3524	530	world	Expansion01	Silvermyst Isle
+3640	3521	530	world	Expansion01	Daggerfen Village
+3641	3521	530	world	Expansion01	Umbrafen Village
+3642	3521	530	world	Expansion01	Feralfen Village
+3643	3521	530	world	Expansion01	Bloodscale Enclave
+3644	3521	530	world	Expansion01	Telredor
+3645	3521	530	world	Expansion01	Zabra'jin
+3646	3521	530	world	Expansion01	Quagg Ridge
+3647	3521	530	world	Expansion01	The Spawning Glen
+3648	3521	530	world	Expansion01	The Dead Mire
+3649	3521	530	world	Expansion01	Sporeggar
+3650	3521	530	world	Expansion01	Ango'rosh Grounds
+3651	3521	530	world	Expansion01	Ango'rosh Stronghold
+3652	3521	530	world	Expansion01	Funggor Cavern
+3653	3521	530	world	Expansion01	Serpent Lake
+3654	3521	530	world	Expansion01	The Drain
+3655	3521	530	world	Expansion01	Umbrafen Lake
+3656	3521	530	world	Expansion01	Marshlight Lake
+3657	3521	530	world	Expansion01	Portal Clearing
+3658	3521	530	world	Expansion01	Sporewind Lake
+3659	3521	530	world	Expansion01	The Lagoon
+3660	3521	530	world	Expansion01	Blades' Run
+3661	3521	530	world	Expansion01	Blade Tooth Canyon
+3662	3430	530	world	Expansion01	Commons Hall
+3663	3430	530	world	Expansion01	Derelict Manor
+3664	3430	530	world	Expansion01	Huntress of the Sun
+3665	3430	530	world	Expansion01	Falconwing Square
+3666	3518	530	world	Expansion01	Halaani Basin
+3667	3521	530	world	Expansion01	Hewn Bog
+3668	3521	530	world	Expansion01	Boha'mu Ruins
+3669	3483	530	world	Expansion01	The Stadium
+3670	3483	530	world	Expansion01	The Overlook
+3671	3483	530	world	Expansion01	Broken Hill
+3672	3518	530	world	Expansion01	Mag'hari Procession
+3673	3518	530	world	Expansion01	Nesingwary Safari
+3674	3519	530	world	Expansion01	Cenarion Thicket
+3675	3519	530	world	Expansion01	Tuurem
+3676	3519	530	world	Expansion01	Veil Shienor
+3677	3519	530	world	Expansion01	Veil Skith
+3678	3519	530	world	Expansion01	Veil Shalas
+3679	3519	530	world	Expansion01	Skettis
+3680	3519	530	world	Expansion01	Blackwind Valley
+3681	3519	530	world	Expansion01	Firewing Point
+3682	3519	530	world	Expansion01	Grangol'var Village
+3683	3519	530	world	Expansion01	Stonebreaker Hold
+3684	3519	530	world	Expansion01	Allerian Stronghold
+3685	3519	530	world	Expansion01	Bonechewer Ruins
+3686	3519	530	world	Expansion01	Veil Lithic
+3687	3519	530	world	Expansion01	Olembas
+3688	3519	530	world	Expansion01	Auchindoun
+3689	3519	530	world	Expansion01	Veil Reskk
+3690	3519	530	world	Expansion01	Blackwind Lake
+3691	3519	530	world	Expansion01	Lake Ere'Noru
+3692	3519	530	world	Expansion01	Lake Jorune
+3693	3519	530	world	Expansion01	Skethyl Mountains
+3694	3519	530	world	Expansion01	Misty Ridge
+3695	3519	530	world	Expansion01	The Broken Hills
+3696	3519	530	world	Expansion01	The Barrier Hills
+3697	3519	530	world	Expansion01	The Bone Wastes
+3698	0	559	arena	PVPZone05	Nagrand Arena
+3699	3518	530	world	Expansion01	Laughing Skull Courtyard
+3700	3518	530	world	Expansion01	The Ring of Blood
+3701	3518	530	world	Expansion01	Arena Floor
+3702	0	562	arena	bladesedgearena	Blade's Edge Arena
+3703	0	530	world	Expansion01	Shattrath City
+3704	3487	530	world	Expansion01	The Shepherd's Gate
+3705	3518	530	world	Expansion01	Telaari Basin
+3706	2366	269	dungeon	CavernsOfTime	The Dark Portal
+3707	3606	534	raid	HyjalPast	Alliance Base
+3708	3606	534	raid	HyjalPast	Horde Encampment
+3709	3606	534	raid	HyjalPast	Night Elf Village
+3710	3606	534	raid	HyjalPast	Nordrassil
+3711	0	571	world	Northrend	Sholazar Basin
+3712	3523	530	world	Expansion01	Area 52
+3713	0	542	dungeon	HellfireDemon	The Blood Furnace
+3714	0	540	dungeon	HellfireMilitary	The Shattered Halls
+3715	0	545	dungeon	CoilfangPumping	The Steamvault
+3716	0	546	dungeon	CoilfangMarsh	The Underbog
+3717	0	547	dungeon	CoilfangDraenei	The Slave Pens
+3718	3521	530	world	Expansion01	Swamprat Post
+3719	3519	530	world	Expansion01	Bleeding Hollow Ruins
+3720	3521	530	world	Expansion01	Twin Spire Ruins
+3721	3523	530	world	Expansion01	The Crumbling Waste
+3722	3523	530	world	Expansion01	Manaforge Ara
+3723	3523	530	world	Expansion01	Arklon Ruins
+3724	3523	530	world	Expansion01	Cosmowrench
+3725	3523	530	world	Expansion01	Ruins of Enkaat
+3726	3523	530	world	Expansion01	Manaforge B'naar
+3727	3523	530	world	Expansion01	The Scrap Field
+3728	3523	530	world	Expansion01	The Vortex Fields
+3729	3523	530	world	Expansion01	The Heap
+3730	3523	530	world	Expansion01	Manaforge Coruu
+3731	3523	530	world	Expansion01	The Tempest Rift
+3732	3523	530	world	Expansion01	Kirin'Var Village
+3733	3523	530	world	Expansion01	The Violet Tower
+3734	3523	530	world	Expansion01	Manaforge Duro
+3735	3523	530	world	Expansion01	Voidwind Plateau
+3736	3523	530	world	Expansion01	Manaforge Ultris
+3737	3523	530	world	Expansion01	Celestial Ridge
+3738	3523	530	world	Expansion01	The Stormspire
+3739	3523	530	world	Expansion01	Forge Base: Oblivion
+3740	3523	530	world	Expansion01	Forge Base: Gehenna
+3741	3523	530	world	Expansion01	Ruins of Farahlon
+3742	3523	530	world	Expansion01	Socrethar's Seat
+3743	3520	530	world	Expansion01	Legion Hold
+3744	3520	530	world	Expansion01	Shadowmoon Village
+3745	3520	530	world	Expansion01	Wildhammer Stronghold
+3746	3520	530	world	Expansion01	The Hand of Gul'dan
+3747	3520	530	world	Expansion01	The Fel Pits
+3748	3520	530	world	Expansion01	The Deathforge
+3749	3520	530	world	Expansion01	Coilskar Cistern
+3750	3520	530	world	Expansion01	Coilskar Point
+3751	3520	530	world	Expansion01	Sunfire Point
+3752	3520	530	world	Expansion01	Illidari Point
+3753	3520	530	world	Expansion01	Ruins of Baa'ri
+3754	3520	530	world	Expansion01	Altar of Sha'tar
+3755	3520	530	world	Expansion01	The Stair of Doom
+3756	3520	530	world	Expansion01	Ruins of Karabor
+3757	3520	530	world	Expansion01	Ata'mal Terrace
+3758	3520	530	world	Expansion01	Netherwing Fields
+3759	3520	530	world	Expansion01	Netherwing Ledge
+3760	3518	530	world	Expansion01	The Barrier Hills
+3761	3518	530	world	Expansion01	The High Path
+3762	3518	530	world	Expansion01	Windyreed Pass
+3763	3518	530	world	Expansion01	Zangar Ridge
+3764	3518	530	world	Expansion01	The Twilight Ridge
+3765	3483	530	world	Expansion01	Razorthorn Trail
+3766	3521	530	world	Expansion01	Orebor Harborage
+3767	3522	530	world	Expansion01	Blades' Run
+3768	3522	530	world	Expansion01	Jagged Ridge
+3769	3522	530	world	Expansion01	Thunderlord Stronghold
+3770	3522	530	world	Expansion01	Blade Tooth Canyon
+3771	3522	530	world	Expansion01	The Living Grove
+3772	3522	530	world	Expansion01	Sylvanaar
+3773	3522	530	world	Expansion01	Bladespire Hold
+3774	3522	530	world	Expansion01	Gruul's Lair
+3775	3522	530	world	Expansion01	Circle of Blood
+3776	3522	530	world	Expansion01	Bloodmaul Outpost
+3777	3522	530	world	Expansion01	Bloodmaul Camp
+3778	3522	530	world	Expansion01	Draenethyst Mine
+3779	3522	530	world	Expansion01	Trogma's Claim
+3780	3522	530	world	Expansion01	Blackwing Coven
+3781	3522	530	world	Expansion01	Grishnath
+3782	3522	530	world	Expansion01	Veil Lashh
+3783	3522	530	world	Expansion01	Veil Vekh
+3784	3522	530	world	Expansion01	Forge Camp: Terror
+3785	3522	530	world	Expansion01	Forge Camp: Wrath
+3786	3522	530	world	Expansion01	Ogri'la
+3787	3522	530	world	Expansion01	Forge Camp: Anger
+3788	3518	530	world	Expansion01	The Low Path
+3789	0	555	dungeon	AuchindounShadow	Shadow Labyrinth
+3790	0	558	dungeon	AuchindounDraenei	Auchenai Crypts
+3791	0	556	dungeon	AuchindounDemon	Sethekk Halls
+3792	0	557	dungeon	AuchindounEthereal	Mana-Tombs
+3793	3483	530	world	Expansion01	Felspark Ravine
+3794	3483	530	world	Expansion01	Valley of Bones
+3795	3483	530	world	Expansion01	Sha'naari Wastes
+3796	3483	530	world	Expansion01	The Warp Fields
+3797	3483	530	world	Expansion01	Fallen Sky Ridge
+3798	3483	530	world	Expansion01	Haal'eshi Gorge
+3799	3483	530	world	Expansion01	Stonewall Canyon
+3800	3483	530	world	Expansion01	Thornfang Hill
+3801	3483	530	world	Expansion01	Mag'har Grounds
+3802	3483	530	world	Expansion01	Void Ridge
+3803	3483	530	world	Expansion01	The Abyssal Shelf
+3804	3483	530	world	Expansion01	The Legion Front
+3805	0	568	raid	ZulAman	Zul'Aman
+3806	3483	530	world	Expansion01	Supply Caravan
+3807	3483	530	world	Expansion01	Reaver's Fall
+3808	3483	530	world	Expansion01	Cenarion Post
+3809	3483	530	world	Expansion01	Southern Rampart
+3810	3483	530	world	Expansion01	Northern Rampart
+3811	3483	530	world	Expansion01	Gor'gaz Outpost
+3812	3483	530	world	Expansion01	Spinebreaker Post
+3813	3483	530	world	Expansion01	The Path of Anguish
+3814	3483	530	world	Expansion01	East Supply Caravan
+3815	3483	530	world	Expansion01	Expedition Point
+3816	3483	530	world	Expansion01	Zeppelin Crash
+3817	0	13	world	test	Testing
+3818	3521	530	world	Expansion01	Bloodscale Grounds
+3819	3521	530	world	Expansion01	Darkcrest Enclave
+3820	0	566	battleground	NetherstormBG	Eye of the Storm
+3821	3520	530	world	Expansion01	Warden's Cage
+3822	3520	530	world	Expansion01	Eclipse Point
+3823	3433	530	world	Expansion01	Isle of Tribulations
+3824	3522	530	world	Expansion01	Bloodmaul Ravine
+3825	3522	530	world	Expansion01	Dragons' End
+3826	3522	530	world	Expansion01	Daggermaw Canyon
+3827	3522	530	world	Expansion01	Vekhaar Stand
+3828	3522	530	world	Expansion01	Ruuan Weald
+3829	3522	530	world	Expansion01	Veil Ruuan
+3830	3522	530	world	Expansion01	Raven's Wood
+3831	3522	530	world	Expansion01	Death's Door
+3832	3522	530	world	Expansion01	Vortex Pinnacle
+3833	3522	530	world	Expansion01	Razor Ridge
+3834	3522	530	world	Expansion01	Ridge of Madness
+3835	3483	530	world	Expansion01	Dustquill Ravine
+3836	0	544	raid	HellfireRaid	Magtheridon's Lair
+3837	3523	530	world	Expansion01	Sunfury Hold
+3838	3483	530	world	Expansion01	Spinebreaker Mountains
+3839	3518	530	world	Expansion01	Abandoned Armory
+3840	3520	530	world	Expansion01	The Black Temple
+3841	3521	530	world	Expansion01	Darkcrest Shore
+3842	3523	530	world	Expansion01	Tempest Keep
+3844	3522	530	world	Expansion01	Mok'Nathal Village
+3845	0	550	raid	TempestKeepRaid	Tempest Keep
+3846	3525	530	world	Expansion01	The Arcatraz
+3847	0	553	dungeon	TempestKeepAtrium	The Botanica
+3848	0	552	dungeon	TempestKeepArcane	The Arcatraz
+3849	0	554	dungeon	TempestKeepFactory	The Mechanar
+3850	3523	530	world	Expansion01	Netherstone
+3851	3523	530	world	Expansion01	Midrealm Post
+3852	3523	530	world	Expansion01	Tuluman's Landing
+3854	3523	530	world	Expansion01	Protectorate Watch Post
+3855	3522	530	world	Expansion01	Circle of Blood Arena
+3856	3433	530	world	Expansion01	Elrendar Crossing
+3857	3524	530	world	Expansion01	Ammen Ford
+3858	3519	530	world	Expansion01	Razorthorn Shelf
+3859	3519	530	world	Expansion01	Silmyr Lake
+3860	3519	530	world	Expansion01	Raastok Glade
+3861	3433	530	world	Expansion01	Thalassian Pass
+3862	3522	530	world	Expansion01	Churning Gulch
+3863	3522	530	world	Expansion01	Broken Wilds
+3864	3522	530	world	Expansion01	Bash'ir Landing
+3865	3522	530	world	Expansion01	Crystal Spine
+3866	3522	530	world	Expansion01	Skald
+3867	3522	530	world	Expansion01	Bladed Gulch
+3868	3523	530	world	Expansion01	Gyro-Plank Bridge
+3869	3820	566	battleground	NetherstormBG	Mage Tower
+3870	3820	566	battleground	NetherstormBG	Blood Elf Tower
+3871	3820	566	battleground	NetherstormBG	Draenei Ruins
+3872	3820	566	battleground	NetherstormBG	Fel Reaver Ruins
+3873	3523	530	world	Expansion01	The Proving Grounds
+3874	3523	530	world	Expansion01	Eco-Dome Farfield
+3875	3523	530	world	Expansion01	Eco-Dome Skyperch
+3876	3523	530	world	Expansion01	Eco-Dome Sutheron
+3877	3523	530	world	Expansion01	Eco-Dome Midrealm
+3878	3523	530	world	Expansion01	Ethereum Staging Grounds
+3879	3523	530	world	Expansion01	Chapel Yard
+3880	3523	530	world	Expansion01	Access Shaft Zeon
+3881	3523	530	world	Expansion01	Trelleum Mine
+3882	3523	530	world	Expansion01	Invasion Point: Destroyer
+3883	3523	530	world	Expansion01	Camp of Boom
+3884	3483	530	world	Expansion01	Spinebreaker Pass
+3885	3519	530	world	Expansion01	Netherweb Ridge
+3886	3519	530	world	Expansion01	Derelict Caravan
+3887	3519	530	world	Expansion01	Refugee Caravan
+3888	3519	530	world	Expansion01	Shadow Tomb
+3889	3519	530	world	Expansion01	Veil Rhaze
+3890	3519	530	world	Expansion01	Tomb of Lights
+3891	3519	530	world	Expansion01	Carrion Hill
+3892	3519	530	world	Expansion01	Writhing Mound
+3893	3519	530	world	Expansion01	Ring of Observance
+3894	3519	530	world	Expansion01	Auchenai Grounds
+3895	3521	530	world	Expansion01	Cenarion Watchpost
+3896	3703	530	world	Expansion01	Aldor Rise
+3897	3703	530	world	Expansion01	Terrace of Light
+3898	3703	530	world	Expansion01	Scryer's Tier
+3899	3703	530	world	Expansion01	Lower City
+3900	3523	530	world	Expansion01	Invasion Point: Overlord
+3901	3519	530	world	Expansion01	Allerian Post
+3902	3519	530	world	Expansion01	Stonebreaker Camp
+3903	3522	530	world	Expansion01	Boulder'mok
+3904	3522	530	world	Expansion01	Cursed Hollow
+3905	3521	530	world	Expansion01	Coilfang Reservoir
+3906	3525	530	world	Expansion01	The Bloodwash
+3907	3525	530	world	Expansion01	Veridian Point
+3908	3525	530	world	Expansion01	Middenvale
+3909	3525	530	world	Expansion01	The Lost Fold
+3910	3525	530	world	Expansion01	Mystwood
+3911	3430	530	world	Expansion01	Tranquil Shore
+3912	3430	530	world	Expansion01	Goldenbough Pass
+3913	3430	530	world	Expansion01	Runestone Falithas
+3914	3430	530	world	Expansion01	Runestone Shan'dor
+3915	3524	530	world	Expansion01	Fairbridge Strand
+3916	3524	530	world	Expansion01	Moongraze Woods
+3917	0	530	world	Expansion01	Auchindoun
+3918	3522	530	world	Expansion01	Toshley's Station
+3919	3522	530	world	Expansion01	Singing Ridge
+3920	3483	530	world	Expansion01	Shatter Point
+3921	3523	530	world	Expansion01	Arklonis Ridge
+3922	3522	530	world	Expansion01	Bladespire Outpost
+3923	0	565	raid	GruulsLair	Gruul's Lair
+3924	3522	530	world	Expansion01	Northmaul Tower
+3925	3522	530	world	Expansion01	Southmaul Tower
+3926	3520	530	world	Expansion01	Shattered Plains
+3927	3520	530	world	Expansion01	Oronok's Farm
+3928	3520	530	world	Expansion01	The Altar of Damnation
+3929	3520	530	world	Expansion01	The Path of Conquest
+3930	3520	530	world	Expansion01	Eclipsion Fields
+3931	3522	530	world	Expansion01	Bladespire Grounds
+3932	3520	530	world	Expansion01	Sketh'lon Base Camp
+3933	3520	530	world	Expansion01	Sketh'lon Wreckage
+3934	3523	530	world	Expansion01	Town Square
+3935	3523	530	world	Expansion01	Wizard Row
+3936	3520	530	world	Expansion01	Deathforge Tower
+3937	3520	530	world	Expansion01	Slag Watch
+3938	3520	530	world	Expansion01	Sanctum of the Stars
+3939	3520	530	world	Expansion01	Dragonmaw Fortress
+3940	3520	530	world	Expansion01	The Fetid Pool
+3941	3520	530	world	Expansion01	Test
+3942	3522	530	world	Expansion01	Razaan's Landing
+3943	3520	530	world	Expansion01	Invasion Point: Cataclysm
+3944	3520	530	world	Expansion01	The Altar of Shadows
+3945	3520	530	world	Expansion01	Netherwing Pass
+3946	3519	530	world	Expansion01	Wayne's Refuge
+3947	3520	530	world	Expansion01	The Scalding Pools
+3948	0	451	world	development	Brian and Pat Test
+3949	3520	530	world	Expansion01	Magma Fields
+3950	3520	530	world	Expansion01	Crimson Watch
+3951	3522	530	world	Expansion01	Evergrove
+3952	3522	530	world	Expansion01	Wyrmskull Bridge
+3953	3522	530	world	Expansion01	Scalewing Shelf
+3954	3522	530	world	Expansion01	Wyrmskull Tunnel
+3955	3483	530	world	Expansion01	Hellfire Basin
+3956	3519	530	world	Expansion01	The Shadow Stair
+3957	3519	530	world	Expansion01	Sha'tari Outpost
+3958	3519	530	world	Expansion01	Sha'tari Base Camp
+3959	0	564	raid	BlackTemple	Black Temple
+3960	3522	530	world	Expansion01	Soulgrinder's Barrow
+3961	3519	530	world	Expansion01	Sorrow Wing Point
+3962	3522	530	world	Expansion01	Vim'gol's Circle
+3963	3522	530	world	Expansion01	Dragonspine Ridge
+3964	3522	530	world	Expansion01	Skyguard Outpost
+3965	3520	530	world	Expansion01	Netherwing Mines
+3966	3520	530	world	Expansion01	Dragonmaw Base Camp
+3967	3520	530	world	Expansion01	Dragonmaw Skyway
+3968	0	572	arena	PVPLordaeron	Ruins of Lordaeron
+3969	3522	530	world	Expansion01	Rivendark's Perch
+3970	3522	530	world	Expansion01	Obsidia's Perch
+3971	3522	530	world	Expansion01	Insidion's Perch
+3972	3522	530	world	Expansion01	Furywing's Perch
+3973	3519	530	world	Expansion01	Blackwind Landing
+3974	3519	530	world	Expansion01	Veil Harr'ik
+3975	3519	530	world	Expansion01	Terokk's Rest
+3976	3519	530	world	Expansion01	Veil Ala'rak
+3977	3519	530	world	Expansion01	Upper Veil Shil'ak
+3978	3519	530	world	Expansion01	Lower Veil Shil'ak
+3979	0	571	world	Northrend	The Frozen Sea
+3980	495	571	world	Northrend	Daggercap Bay
+3981	495	571	world	Northrend	Valgarde
+3982	495	571	world	Northrend	Wyrmskull Village
+3983	495	571	world	Northrend	Utgarde Keep
+3984	495	571	world	Northrend	Nifflevar
+3985	495	571	world	Northrend	Falls of Ymiron
+3986	495	571	world	Northrend	Echo Reach
+3987	495	571	world	Northrend	The Isle of Spears
+3988	495	571	world	Northrend	Kamagua
+3989	495	571	world	Northrend	Garvan's Reef
+3990	495	571	world	Northrend	Scalawag Point
+3991	495	571	world	Northrend	New Agamand
+3992	495	571	world	Northrend	The Ancient Lift
+3993	495	571	world	Northrend	Westguard Turret
+3994	495	571	world	Northrend	Halgrind
+3995	495	571	world	Northrend	The Laughing Stand
+3996	495	571	world	Northrend	Baelgun's Excavation Site
+3997	495	571	world	Northrend	Explorers' League Outpost
+3998	495	571	world	Northrend	Westguard Keep
+3999	495	571	world	Northrend	Steel Gate
+4000	495	571	world	Northrend	Vengeance Landing
+4001	495	571	world	Northrend	Baleheim
+4002	495	571	world	Northrend	Skorn
+4003	495	571	world	Northrend	Fort Wildervar
+4004	495	571	world	Northrend	Vileprey Village
+4005	495	571	world	Northrend	Ivald's Ruin
+4006	495	571	world	Northrend	Gjalerbron
+4007	495	571	world	Northrend	Tomb of the Lost Kings
+4008	3522	530	world	Expansion01	Shartuul's Transporter
+4009	3959	564	raid	BlackTemple	Illidari Training Grounds
+4010	15	1	world	Kalimdor	Mudsprocket
+4018	495	571	world	Northrend	Camp Winterhoof
+4019	0	451	world	development	Development Land
+4020	3537	571	world	Northrend	Mightstone Quarry
+4021	3537	571	world	Northrend	Bloodspore Plains
+4022	3537	571	world	Northrend	Gammoth
+4023	3537	571	world	Northrend	Amber Ledge
+4024	3537	571	world	Northrend	Coldarra
+4025	3537	571	world	Northrend	The Westrift
+4026	3537	571	world	Northrend	The Transitus Stair
+4027	3537	571	world	Northrend	Coast of Echoes
+4028	3537	571	world	Northrend	Riplash Strand
+4029	3537	571	world	Northrend	Riplash Ruins
+4030	3537	571	world	Northrend	Coast of Idols
+4031	3537	571	world	Northrend	Pal'ea
+4032	3537	571	world	Northrend	Valiance Keep
+4033	3537	571	world	Northrend	Winterfin Village
+4034	3537	571	world	Northrend	The Borean Wall
+4035	3537	571	world	Northrend	The Geyser Fields
+4036	3537	571	world	Northrend	Fizzcrank Pumping Station
+4037	3537	571	world	Northrend	Taunka'le Village
+4038	3537	571	world	Northrend	Magnamoth Caverns
+4039	3537	571	world	Northrend	Coldrock Quarry
+4040	3537	571	world	Northrend	Njord's Breath Bay
+4041	3537	571	world	Northrend	Kaskala
+4042	3537	571	world	Northrend	Transborea
+4043	3537	571	world	Northrend	The Flood Plains
+4046	15	1	world	Kalimdor	Direhorn Post
+4047	15	1	world	Kalimdor	Nat's Landing
+4048	495	571	world	Northrend	Ember Clutch
+4049	15	1	world	Kalimdor	Tabetha's Farm
+4050	495	571	world	Northrend	Derelict Strand
+4051	495	571	world	Northrend	The Frozen Glade
+4052	495	571	world	Northrend	The Vibrant Glade
+4053	495	571	world	Northrend	The Twisted Glade
+4054	495	571	world	Northrend	Rivenwood
+4055	495	571	world	Northrend	Caldemere Lake
+4056	495	571	world	Northrend	Utgarde Catacombs
+4057	495	571	world	Northrend	Shield Hill
+4058	495	571	world	Northrend	Lake Cauldros
+4059	495	571	world	Northrend	Cauldros Isle
+4060	495	571	world	Northrend	Bleeding Vale
+4061	495	571	world	Northrend	Giants' Run
+4062	495	571	world	Northrend	Apothecary Camp
+4063	495	571	world	Northrend	Ember Spear Tower
+4064	495	571	world	Northrend	Shattered Straits
+4065	495	571	world	Northrend	Gjalerhorn
+4066	495	571	world	Northrend	Frostblade Peak
+4067	139	0	world	Azeroth	Plaguewood Tower
+4068	495	571	world	Northrend	West Spear Tower
+4069	495	571	world	Northrend	North Spear Tower
+4070	495	571	world	Northrend	Chillmere Coast
+4071	495	571	world	Northrend	Whisper Gulch
+4072	151	451	world	development	Sub zone
+4073	495	571	world	Northrend	Winter's Terrace
+4074	495	571	world	Northrend	The Waking Halls
+4075	0	580	raid	SunwellPlateau	Sunwell Plateau
+4076	0	598	dungeon	Sunwell5Man	Reuse Me 7
+4077	495	571	world	Northrend	Sorlof's Strand
+4078	3519	530	world	Expansion01	Razorthorn Rise
+4079	495	571	world	Northrend	Frostblade Pass
+4080	0	530	world	Expansion01	Isle of Quel'Danas
+4081	4080	530	world	Expansion01	The Dawnchaser
+4082	4080	530	world	Expansion01	The Sin'loren
+4083	4080	530	world	Expansion01	Silvermoon's Pride
+4084	4080	530	world	Expansion01	The Bloodoath
+4085	4080	530	world	Expansion01	Shattered Sun Staging Area
+4086	4080	530	world	Expansion01	Sun's Reach Sanctum
+4087	4080	530	world	Expansion01	Sun's Reach Harbor
+4088	4080	530	world	Expansion01	Sun's Reach Armory
+4089	4080	530	world	Expansion01	Dawnstar Village
+4090	4080	530	world	Expansion01	The Dawning Square
+4091	4080	530	world	Expansion01	Greengill Coast
+4092	4080	530	world	Expansion01	The Dead Scar
+4093	4080	530	world	Expansion01	The Sun Forge
+4094	4080	530	world	Expansion01	Sunwell Plateau
+4095	4080	530	world	Expansion01	Magisters' Terrace
+4096	4019	451	world	development	Claytön's WoWEdit Land
+4097	3537	571	world	Northrend	Winterfin Caverns
+4098	3537	571	world	Northrend	Glimmer Bay
+4099	3537	571	world	Northrend	Winterfin Retreat
+4100	0	595	dungeon	StratholmeCOT	The Culling of Stratholme
+4101	3537	571	world	Northrend	Sands of Nasam
+4102	3537	571	world	Northrend	Krom's Landing
+4103	3537	571	world	Northrend	Nasam's Talon
+4104	3537	571	world	Northrend	Echo Cove
+4105	3537	571	world	Northrend	Beryl Point
+4106	3537	571	world	Northrend	Garrosh's Landing
+4107	3537	571	world	Northrend	Warsong Jetty
+4108	3537	571	world	Northrend	Fizzcrank Airstrip
+4109	3537	571	world	Northrend	Lake Kum'uya
+4110	3537	571	world	Northrend	Farshire Fields
+4111	3537	571	world	Northrend	Farshire
+4112	3537	571	world	Northrend	Farshire Lighthouse
+4113	3537	571	world	Northrend	Unu'pe
+4114	3537	571	world	Northrend	Death's Stand
+4115	3537	571	world	Northrend	The Abandoned Reach
+4116	3537	571	world	Northrend	Scalding Pools
+4117	3537	571	world	Northrend	Steam Springs
+4118	3537	571	world	Northrend	Talramas
+4119	3537	571	world	Northrend	Festering Pools
+4120	3537	571	world	Northrend	The Nexus
+4121	3537	571	world	Northrend	Transitus Shield
+4122	3537	571	world	Northrend	Bor'gorok Outpost
+4123	3537	571	world	Northrend	Magmoth
+4124	3537	571	world	Northrend	The Dens of Dying
+4125	3537	571	world	Northrend	Temple City of En'kilah
+4126	3537	571	world	Northrend	The Wailing Ziggurat
+4127	3537	571	world	Northrend	Steeljaw's Caravan
+4128	3537	571	world	Northrend	Naxxanar
+4129	3537	571	world	Northrend	Warsong Hold
+4130	3537	571	world	Northrend	Plains of Nasam
+4131	0	585	dungeon	Sunwell5ManFix	Magisters' Terrace
+4132	3537	571	world	Northrend	Ruins of Eldra'nath
+4133	3537	571	world	Northrend	Charred Rise
+4134	3537	571	world	Northrend	Blistering Pool
+4135	3537	571	world	Northrend	Spire of Blood
+4136	3537	571	world	Northrend	Spire of Decay
+4137	3537	571	world	Northrend	Spire of Pain
+4138	3537	571	world	Northrend	Frozen Reach
+4139	4075	580	raid	SunwellPlateau	Parhelion Plaza
+4140	4075	580	raid	SunwellPlateau	The Dead Scar
+4141	3537	571	world	Northrend	Torp's Farm
+4142	3537	571	world	Northrend	Warsong Granary
+4143	3537	571	world	Northrend	Warsong Slaughterhouse
+4144	3537	571	world	Northrend	Warsong Farms Outpost
+4145	3537	571	world	Northrend	West Point Station
+4146	3537	571	world	Northrend	North Point Station
+4147	3537	571	world	Northrend	Mid Point Station
+4148	3537	571	world	Northrend	South Point Station
+4149	3537	571	world	Northrend	D.E.H.T.A. Encampment
+4150	3537	571	world	Northrend	Kaw's Roost
+4151	65	571	world	Northrend	Westwind Refugee Camp
+4152	65	571	world	Northrend	Moa'ki Harbor
+4153	65	571	world	Northrend	Indu'le Village
+4154	65	571	world	Northrend	Snowfall Glade
+4155	65	571	world	Northrend	The Half Shell
+4156	65	571	world	Northrend	Surge Needle
+4157	65	571	world	Northrend	Moonrest Gardens
+4158	65	571	world	Northrend	Stars' Rest
+4159	394	571	world	Northrend	Westfall Brigade Encampment
+4160	65	571	world	Northrend	Lothalor Woodlands
+4161	65	571	world	Northrend	Wyrmrest Temple
+4162	65	571	world	Northrend	Icemist Falls
+4163	65	571	world	Northrend	Icemist Village
+4164	65	571	world	Northrend	The Pit of Narjun
+4165	65	571	world	Northrend	Agmar's Hammer
+4166	65	571	world	Northrend	Lake Indu'le
+4167	65	571	world	Northrend	Obsidian Dragonshrine
+4168	65	571	world	Northrend	Ruby Dragonshrine
+4169	65	571	world	Northrend	Fordragon Hold
+4170	65	571	world	Northrend	Kor'kron Vanguard
+4171	65	571	world	Northrend	The Court of Skulls
+4172	65	571	world	Northrend	Angrathar the Wrathgate
+4173	65	571	world	Northrend	Galakrond's Rest
+4174	65	571	world	Northrend	The Wicked Coil
+4175	65	571	world	Northrend	Bronze Dragonshrine
+4176	65	571	world	Northrend	The Mirror of Dawn
+4177	65	571	world	Northrend	Wintergarde Keep
+4178	65	571	world	Northrend	Wintergarde Mine
+4179	65	571	world	Northrend	Emerald Dragonshrine
+4180	65	571	world	Northrend	New Hearthglen
+4181	65	571	world	Northrend	Crusader's Landing
+4182	65	571	world	Northrend	Sinner's Folly
+4183	65	571	world	Northrend	Azure Dragonshrine
+4184	65	571	world	Northrend	Path of the Titans
+4185	65	571	world	Northrend	The Forgotten Shore
+4186	65	571	world	Northrend	Venomspite
+4187	65	571	world	Northrend	The Crystal Vice
+4188	65	571	world	Northrend	The Carrion Fields
+4189	65	571	world	Northrend	Onslaught Base Camp
+4190	65	571	world	Northrend	Thorson's Post
+4191	65	571	world	Northrend	Light's Trust
+4192	65	571	world	Northrend	Frostmourne Cavern
+4193	65	571	world	Northrend	Scarlet Point
+4194	65	571	world	Northrend	Jintha'kalar
+4195	65	571	world	Northrend	Ice Heart Cavern
+4196	0	600	dungeon	DrakTheronKeep	Drak'Tharon Keep
+4197	0	571	world	Northrend	Wintergrasp
+4198	65	571	world	Northrend	Kili'ua's Atoll
+4199	394	571	world	Northrend	Silverbrook
+4200	394	571	world	Northrend	Vordrassil's Heart
+4201	0	571	world	Northrend	Vordrassil's Tears
+4202	394	571	world	Northrend	Vordrassil's Tears
+4203	394	571	world	Northrend	Vordrassil's Limb
+4204	394	571	world	Northrend	Amberpine Lodge
+4205	394	571	world	Northrend	Solstice Village
+4206	394	571	world	Northrend	Conquest Hold
+4207	394	571	world	Northrend	Voldrune
+4208	394	571	world	Northrend	Granite Springs
+4209	394	571	world	Northrend	Zeb'Halak
+4210	394	571	world	Northrend	Drak'Tharon Keep
+4211	394	571	world	Northrend	Camp Oneqwah
+4212	394	571	world	Northrend	Eastwind Shore
+4213	394	571	world	Northrend	The Broken Bluffs
+4214	394	571	world	Northrend	Boulder Hills
+4215	394	571	world	Northrend	Rage Fang Shrine
+4216	394	571	world	Northrend	Drakil'jin Ruins
+4217	394	571	world	Northrend	Blackriver Logging Camp
+4218	394	571	world	Northrend	Heart's Blood Shrine
+4219	394	571	world	Northrend	Hollowstone Mine
+4220	394	571	world	Northrend	Dun Argol
+4221	394	571	world	Northrend	Thor Modan
+4222	394	571	world	Northrend	Blue Sky Logging Grounds
+4223	65	571	world	Northrend	Maw of Neltharion
+4224	65	571	world	Northrend	The Briny Pinnacle
+4225	65	571	world	Northrend	Glittering Strand
+4226	495	571	world	Northrend	Iskaal
+4227	65	571	world	Northrend	Dragon's Fall
+4228	0	578	dungeon	Nexus80	The Oculus
+4229	394	571	world	Northrend	Prospector's Point
+4230	65	571	world	Northrend	Coldwind Heights
+4231	394	571	world	Northrend	Redwood Trading Post
+4232	65	571	world	Northrend	Vengeance Pass
+4233	65	571	world	Northrend	Dawn's Reach
+4234	65	571	world	Northrend	Naxxramas
+4235	394	571	world	Northrend	Heartwood Trading Post
+4236	394	571	world	Northrend	Evergreen Trading Post
+4237	394	571	world	Northrend	Spruce Point Post
+4238	394	571	world	Northrend	White Pine Trading Post
+4239	394	571	world	Northrend	Aspen Grove Post
+4240	394	571	world	Northrend	Forest's Edge Post
+4241	65	571	world	Northrend	Eldritch Heights
+4242	394	571	world	Northrend	Venture Bay
+4243	65	571	world	Northrend	Wintergarde Crypt
+4244	394	571	world	Northrend	Bloodmoon Isle
+4245	394	571	world	Northrend	Shadowfang Tower
+4246	65	571	world	Northrend	Wintergarde Mausoleum
+4247	394	571	world	Northrend	Duskhowl Den
+4248	394	571	world	Northrend	The Conquest Pit
+4249	394	571	world	Northrend	The Path of Iron
+4250	394	571	world	Northrend	Ruins of Tethys
+4251	394	571	world	Northrend	Silverbrook Hills
+4252	495	571	world	Northrend	The Broken Bluffs
+4253	65	571	world	Northrend	7th Legion Front
+4254	65	571	world	Northrend	The Dragon Wastes
+4255	394	571	world	Northrend	Ruins of Drak'Zin
+4256	65	571	world	Northrend	Drak'Mar Lake
+4257	65	571	world	Northrend	Dragonspine Tributary
+4258	0	571	world	Northrend	The North Sea
+4259	394	571	world	Northrend	Drak'ural
+4260	495	571	world	Northrend	Thorvald's Camp
+4261	495	571	world	Northrend	Ghostblade Post
+4262	394	571	world	Northrend	Ashwood Post
+4263	495	571	world	Northrend	Lydell's Ambush
+4264	0	599	dungeon	Ulduar70	Halls of Stone
+4265	0	576	dungeon	Nexus70	The Nexus
+4266	394	571	world	Northrend	Harkor's Camp
+4267	394	571	world	Northrend	Vordrassil Pass
+4268	394	571	world	Northrend	Ruuna's Camp
+4269	3537	571	world	Northrend	Shrine of Scales
+4270	394	571	world	Northrend	Drak'atal Passage
+4271	495	571	world	Northrend	Utgarde Pinnacle
+4272	0	602	dungeon	Ulduar80	Halls of Lightning
+4273	0	603	raid	UlduarRaid	Ulduar
+4275	66	571	world	Northrend	The Argent Stand
+4276	66	571	world	Northrend	Altar of Sseratus
+4277	0	601	dungeon	Azjol_Uppercity	Azjol-Nerub
+4278	66	571	world	Northrend	Drak'Sotra Fields
+4279	66	571	world	Northrend	Drak'Sotra
+4280	66	571	world	Northrend	Drak'Agal
+4281	139	0	world	Azeroth	Acherus: The Ebon Hold
+4282	3711	571	world	Northrend	The Avalanche
+4283	3711	571	world	Northrend	The Lost Lands
+4284	3711	571	world	Northrend	Nesingwary Base Camp
+4285	3711	571	world	Northrend	The Seabreach Flow
+4286	3711	571	world	Northrend	The Bones of Nozronn
+4287	3711	571	world	Northrend	Kartak's Hold
+4288	3711	571	world	Northrend	Sparktouched Haven
+4289	3711	571	world	Northrend	The Path of the Lifewarden
+4290	3711	571	world	Northrend	River's Heart
+4291	3711	571	world	Northrend	Rainspeaker Canopy
+4292	3711	571	world	Northrend	Frenzyheart Hill
+4293	3711	571	world	Northrend	Wildgrowth Mangal
+4294	66	571	world	Northrend	Heb'Valok
+4295	3711	571	world	Northrend	The Sundered Shard
+4296	3711	571	world	Northrend	The Lifeblood Pillar
+4297	3711	571	world	Northrend	Mosswalker Village
+4298	0	609	world	DeathKnightStart	Plaguelands: The Scarlet Enclave
+4299	66	571	world	Northrend	Kolramas
+4300	3711	571	world	Northrend	Waygate
+4302	3711	571	world	Northrend	The Skyreach Pillar
+4303	3711	571	world	Northrend	Hardknuckle Clearing
+4304	3711	571	world	Northrend	Sapphire Hive
+4306	3711	571	world	Northrend	Mistwhisper Refuge
+4307	3711	571	world	Northrend	The Glimmering Pillar
+4308	3711	571	world	Northrend	Spearborn Encampment
+4309	66	571	world	Northrend	Drak'Tharon Keep
+4310	66	571	world	Northrend	Zeramas
+4311	66	571	world	Northrend	Reliquary of Agony
+4312	66	571	world	Northrend	Ebon Watch
+4313	66	571	world	Northrend	Thrym's End
+4314	66	571	world	Northrend	Voltarus
+4315	66	571	world	Northrend	Reliquary of Pain
+4316	66	571	world	Northrend	Rageclaw Den
+4317	66	571	world	Northrend	Light's Breach
+4318	66	571	world	Northrend	Pools of Zha'Jin
+4319	66	571	world	Northrend	Zim'Abwa
+4320	66	571	world	Northrend	Amphitheater of Anguish
+4321	66	571	world	Northrend	Altar of Rhunok
+4322	66	571	world	Northrend	Altar of Har'koa
+4323	66	571	world	Northrend	Zim'Torga
+4324	66	571	world	Northrend	Pools of Jin'Alai
+4325	66	571	world	Northrend	Altar of Quetz'lun
+4326	66	571	world	Northrend	Heb'Drakkar
+4327	66	571	world	Northrend	Drak'Mabwa
+4328	66	571	world	Northrend	Zim'Rhuk
+4329	66	571	world	Northrend	Altar of Mam'toth
+4342	4298	609	world	DeathKnightStart	Acherus: The Ebon Hold
+4343	4298	609	world	DeathKnightStart	New Avalon
+4344	4298	609	world	DeathKnightStart	New Avalon Fields
+4345	4298	609	world	DeathKnightStart	New Avalon Orchard
+4346	4298	609	world	DeathKnightStart	New Avalon Town Hall
+4347	4298	609	world	DeathKnightStart	Havenshire
+4348	4298	609	world	DeathKnightStart	Havenshire Farms
+4349	4298	609	world	DeathKnightStart	Havenshire Lumber Mill
+4350	4298	609	world	DeathKnightStart	Havenshire Stables
+4351	4298	609	world	DeathKnightStart	Scarlet Hold
+4352	4298	609	world	DeathKnightStart	Chapel of the Crimson Flame
+4353	4298	609	world	DeathKnightStart	Light's Point Tower
+4354	4298	609	world	DeathKnightStart	Light's Point
+4355	4298	609	world	DeathKnightStart	Crypt of Remembrance
+4356	4298	609	world	DeathKnightStart	Death's Breach
+4357	4298	609	world	DeathKnightStart	The Noxious Glade
+4358	4298	609	world	DeathKnightStart	Tyr's Hand
+4359	4298	609	world	DeathKnightStart	King's Harbor
+4360	4298	609	world	DeathKnightStart	Scarlet Overlook
+4361	4298	609	world	DeathKnightStart	Light's Hope Chapel
+4362	4298	609	world	DeathKnightStart	Sinner's Folly
+4363	4298	609	world	DeathKnightStart	Pestilent Scar
+4364	4298	609	world	DeathKnightStart	Browman Mill
+4365	4298	609	world	DeathKnightStart	Havenshire Mine
+4366	394	571	world	Northrend	Ursoc's Den
+4367	3711	571	world	Northrend	The Blight Line
+4368	3711	571	world	Northrend	The Bonefields
+4369	3711	571	world	Northrend	Dorian's Outpost
+4371	66	571	world	Northrend	Mam'toth Crater
+4372	66	571	world	Northrend	Zol'Maz Stronghold
+4373	66	571	world	Northrend	Zol'Heb
+4374	66	571	world	Northrend	Rageclaw Lake
+4375	66	571	world	Northrend	Gundrak
+4376	3711	571	world	Northrend	The Savage Thicket
+4377	4298	609	world	DeathKnightStart	New Avalon Forge
+4378	0	617	arena	DalaranArena	Dalaran Arena
+4379	495	571	world	Northrend	Valgarde
+4380	495	571	world	Northrend	Westguard Inn
+4381	490	1	world	Kalimdor	Waygate
+4382	490	1	world	Kalimdor	The Shaper's Terrace
+4383	3711	571	world	Northrend	Lakeside Landing
+4384	0	607	battleground	NorthrendBG	Strand of the Ancients
+4385	3711	571	world	Northrend	Bittertide Lake
+4386	3711	571	world	Northrend	Rainspeaker Rapids
+4387	3711	571	world	Northrend	Frenzyheart River
+4388	3711	571	world	Northrend	Wintergrasp River
+4389	3711	571	world	Northrend	The Suntouched Pillar
+4390	66	571	world	Northrend	Frigid Breach
+4391	3711	571	world	Northrend	Swindlegrin's Dig
+4392	3711	571	world	Northrend	The Stormwright's Shelf
+4393	3711	571	world	Northrend	Death's Hand Encampment
+4394	4298	609	world	DeathKnightStart	Scarlet Tavern
+4395	0	571	world	Northrend	Dalaran
+4396	65	571	world	Northrend	Nozzlerust Post
+4399	3537	571	world	Northrend	Farshire Mine
+4400	3711	571	world	Northrend	The Mosslight Pillar
+4401	3537	571	world	Northrend	Saragosa's Landing
+4402	495	571	world	Northrend	Vengeance Lift
+4403	495	571	world	Northrend	Balejar Watch
+4404	495	571	world	Northrend	New Agamand Inn
+4405	4277	601	dungeon	Azjol_Uppercity	Passage of Lost Fiends
+4406	0	618	arena	OrgrimmarArena	The Ring of Valor
+4407	2597	30	battleground	PVPZone01	Hall of the Frostwolf
+4408	2597	30	battleground	PVPZone01	Hall of the Stormpike
+4411	1519	0	world	Azeroth	Stormwind Harbor
+4412	3711	571	world	Northrend	The Makers' Overlook
+4413	3711	571	world	Northrend	The Makers' Perch
+4414	65	571	world	Northrend	Scarlet Tower
+4415	0	608	dungeon	DalaranPrison	The Violet Hold
+4416	0	604	dungeon	GunDrak	Gundrak
+4417	210	571	world	Northrend	Onslaught Harbor
+4418	67	571	world	Northrend	K3
+4419	67	571	world	Northrend	Snowblind Hills
+4420	67	571	world	Northrend	Snowblind Terrace
+4421	67	571	world	Northrend	Garm
+4422	67	571	world	Northrend	Brunnhildar Village
+4423	67	571	world	Northrend	Sifreldar Village
+4424	67	571	world	Northrend	Valkyrion
+4425	67	571	world	Northrend	The Forlorn Mine
+4426	67	571	world	Northrend	Bor's Breath River
+4427	67	571	world	Northrend	Argent Vanguard
+4428	67	571	world	Northrend	Frosthold
+4429	67	571	world	Northrend	Grom'arsh Crash-Site
+4430	67	571	world	Northrend	Temple of Storms
+4431	67	571	world	Northrend	Engine of the Makers
+4432	67	571	world	Northrend	The Foot Steppes
+4433	67	571	world	Northrend	Dragonspine Peaks
+4434	67	571	world	Northrend	Nidavelir
+4435	67	571	world	Northrend	Narvir's Cradle
+4436	67	571	world	Northrend	Snowdrift Plains
+4437	67	571	world	Northrend	Valley of Ancient Winters
+4438	67	571	world	Northrend	Dun Niffelem
+4439	67	571	world	Northrend	Frostfield Lake
+4440	67	571	world	Northrend	Thunderfall
+4441	67	571	world	Northrend	Camp Tunka'lo
+4442	67	571	world	Northrend	Brann's Base-Camp
+4443	67	571	world	Northrend	Gate of Echoes
+4444	67	571	world	Northrend	Plain of Echoes
+4445	67	571	world	Northrend	Ulduar
+4446	67	571	world	Northrend	Terrace of the Makers
+4447	67	571	world	Northrend	Gate of Lightning
+4448	67	571	world	Northrend	Path of the Titans
+4449	67	571	world	Northrend	Uldis
+4450	67	571	world	Northrend	Loken's Bargain
+4451	67	571	world	Northrend	Bor's Fall
+4452	67	571	world	Northrend	Bor's Breath
+4453	67	571	world	Northrend	Rohemdal Pass
+4454	67	571	world	Northrend	The Storm Foundry
+4455	67	571	world	Northrend	Hibernal Cavern
+4456	394	571	world	Northrend	Voldrune Dwelling
+4457	67	571	world	Northrend	Torseg's Rest
+4458	67	571	world	Northrend	Sparksocket Minefield
+4459	67	571	world	Northrend	Ricket's Folly
+4460	67	571	world	Northrend	Garm's Bane
+4461	67	571	world	Northrend	Garm's Rise
+4462	67	571	world	Northrend	Crystalweb Cavern
+4463	67	571	world	Northrend	Temple of Life
+4464	67	571	world	Northrend	Temple of Order
+4465	67	571	world	Northrend	Temple of Winter
+4466	67	571	world	Northrend	Temple of Invention
+4467	210	571	world	Northrend	Death's Rise
+4468	66	571	world	Northrend	The Dead Fields
+4469	66	571	world	Northrend	Dargath's Demise
+4470	210	571	world	Northrend	The Hidden Hollow
+4471	4019	451	world	development	Bernau's Happy Fun Land
+4472	67	571	world	Northrend	Frostgrip's Hollow
+4473	67	571	world	Northrend	The Frigid Tomb
+4474	495	571	world	Northrend	Twin Shores
+4475	394	571	world	Northrend	Zim'bo's Hideout
+4476	67	571	world	Northrend	Abandoned Camp
+4477	210	571	world	Northrend	The Shadow Vault
+4478	65	571	world	Northrend	Coldwind Pass
+4479	495	571	world	Northrend	Winter's Breath Lake
+4480	394	571	world	Northrend	The Forgotten Overlook
+4481	66	571	world	Northrend	Jintha'kalar Passage
+4482	394	571	world	Northrend	Arriga Footbridge
+4483	3711	571	world	Northrend	The Lost Passage
+4484	67	571	world	Northrend	Bouldercrag's Refuge
+4485	67	571	world	Northrend	The Inventor's Library
+4486	67	571	world	Northrend	The Frozen Mine
+4487	67	571	world	Northrend	Frostfloe Deep
+4488	67	571	world	Northrend	The Howling Hollow
+4489	66	571	world	Northrend	Crusader Forward Camp
+4490	67	571	world	Northrend	Stormcrest
+4491	394	571	world	Northrend	Bonesnap's Camp
+4492	210	571	world	Northrend	Ufrang's Hall
+4493	0	615	raid	ChamberOfAspectsBlack	The Obsidian Sanctum
+4494	0	619	dungeon	Azjol_LowerCity	Ahn'kahet: The Old Kingdom
+4495	67	571	world	Northrend	Fjorn's Anvil
+4496	210	571	world	Northrend	Jotunheim
+4497	210	571	world	Northrend	Savage Ledge
+4498	210	571	world	Northrend	Halls of the Ancestors
+4499	67	571	world	Northrend	The Blighted Pool
+4500	0	616	raid	NexusRaid	The Eye of Eternity
+4501	210	571	world	Northrend	The Argent Vanguard
+4502	67	571	world	Northrend	Mimir's Workshop
+4503	210	571	world	Northrend	Ironwall Dam
+4504	210	571	world	Northrend	Valley of Echoes
+4505	210	571	world	Northrend	The Breach
+4506	210	571	world	Northrend	Scourgeholme
+4507	210	571	world	Northrend	The Broken Front
+4508	210	571	world	Northrend	Mord'rethar: The Death Gate
+4509	210	571	world	Northrend	The Bombardment
+4510	210	571	world	Northrend	Aldur'thar: The Desolation Gate
+4511	210	571	world	Northrend	The Skybreaker
+4512	210	571	world	Northrend	Orgrim's Hammer
+4513	210	571	world	Northrend	Ymirheim
+4514	210	571	world	Northrend	Saronite Mines
+4515	210	571	world	Northrend	The Conflagration
+4516	210	571	world	Northrend	Ironwall Rampart
+4517	210	571	world	Northrend	Weeping Quarry
+4518	210	571	world	Northrend	Corp'rethar: The Horror Gate
+4519	210	571	world	Northrend	The Court of Bones
+4520	210	571	world	Northrend	Malykriss: The Vile Hold
+4521	210	571	world	Northrend	Cathedral of Darkness
+4522	210	571	world	Northrend	Icecrown Citadel
+4523	210	571	world	Northrend	Icecrown Glacier
+4524	210	571	world	Northrend	Valhalas
+4525	210	571	world	Northrend	The Underhalls
+4526	210	571	world	Northrend	Njorndar Village
+4527	210	571	world	Northrend	Balargarde Fortress
+4528	210	571	world	Northrend	Kul'galar Keep
+4529	210	571	world	Northrend	The Crimson Cathedral
+4530	210	571	world	Northrend	Sanctum of Reanimation
+4531	210	571	world	Northrend	The Fleshwerks
+4532	495	571	world	Northrend	Vengeance Landing Inn
+4533	210	571	world	Northrend	Sindragosa's Fall
+4534	495	571	world	Northrend	Wildervar Mine
+4535	67	571	world	Northrend	The Pit of the Fang
+4536	67	571	world	Northrend	Frosthowl Cavern
+4537	210	571	world	Northrend	The Valley of Lost Hope
+4538	4197	571	world	Northrend	The Sunken Ring
+4539	4197	571	world	Northrend	The Broken Temple
+4540	210	571	world	Northrend	The Valley of Fallen Heroes
+4541	210	571	world	Northrend	Vanguard Infirmary
+4542	67	571	world	Northrend	Hall of the Shaper
+4543	67	571	world	Northrend	Temple of Wisdom
+4544	139	0	world	Azeroth	Death's Breach
+4545	139	0	world	Azeroth	Abandoned Mine
+4546	139	0	world	Azeroth	Ruins of the Scarlet Enclave
+4547	67	571	world	Northrend	Halls of Stone
+4548	67	571	world	Northrend	Halls of Lightning
+4549	2817	571	world	Northrend	The Great Tree
+4550	2817	571	world	Northrend	The Mirror of Twilight
+4551	2817	571	world	Northrend	The Twilight Rivulet
+4552	2817	571	world	Northrend	The Decrepit Flow
+4553	2817	571	world	Northrend	Forlorn Woods
+4554	2817	571	world	Northrend	Ruins of Shandaral
+4555	2817	571	world	Northrend	The Azure Front
+4556	2817	571	world	Northrend	Violet Stand
+4557	2817	571	world	Northrend	The Unbound Thicket
+4558	2817	571	world	Northrend	Sunreaver's Command
+4559	2817	571	world	Northrend	Windrunner's Overlook
+4560	4395	571	world	Northrend	The Underbelly
+4564	4395	571	world	Northrend	Krasus' Landing
+4567	4395	571	world	Northrend	The Violet Hold
+4568	4395	571	world	Northrend	The Eventide
+4569	4395	571	world	Northrend	Sewer Exit Pipe
+4570	4395	571	world	Northrend	Circle of Wills
+4571	3277	489	battleground	PVPZone03	Silverwing Flag Room
+4572	3277	489	battleground	PVPZone03	Warsong Flag Room
+4575	4197	571	world	Northrend	Wintergrasp Fortress
+4576	4197	571	world	Northrend	Central Bridge
+4577	4197	571	world	Northrend	Eastern Bridge
+4578	4197	571	world	Northrend	Western Bridge
+4579	66	571	world	Northrend	Dubra'Jin
+4580	210	571	world	Northrend	Crusaders' Pinnacle
+4581	4197	571	world	Northrend	Flamewatch Tower
+4582	4197	571	world	Northrend	Winter's Edge Tower
+4583	4197	571	world	Northrend	Shadowsight Tower
+4584	4197	571	world	Northrend	The Cauldron of Flames
+4585	4197	571	world	Northrend	Glacial Falls
+4586	4197	571	world	Northrend	Windy Bluffs
+4587	4197	571	world	Northrend	The Forest of Shadows
+4588	210	571	world	Northrend	Blackwatch
+4589	4197	571	world	Northrend	The Chilled Quagmire
+4590	4197	571	world	Northrend	The Steppe of Life
+4591	210	571	world	Northrend	Silent Vigil
+4592	67	571	world	Northrend	Gimorak's Den
+4593	210	571	world	Northrend	The Pit of Fiends
+4594	210	571	world	Northrend	Battlescar Spire
+4595	210	571	world	Northrend	Hall of Horrors
+4596	210	571	world	Northrend	The Circle of Suffering
+4597	210	571	world	Northrend	Rise of Suffering
+4598	4395	571	world	Northrend	Krasus' Landing
+4599	4395	571	world	Northrend	Sewer Exit Pipe
+4601	4395	571	world	Northrend	Dalaran Island
+4602	0	571	world	Northrend	Force Interior
+4603	0	624	raid	WintergraspRaid	Vault of Archavon
+4604	4384	607	battleground	NorthrendBG	Gate of the Red Sun
+4605	4384	607	battleground	NorthrendBG	Gate of the Blue Sapphire
+4606	4384	607	battleground	NorthrendBG	Gate of the Green Emerald
+4607	4384	607	battleground	NorthrendBG	Gate of the Purple Amethyst
+4608	4384	607	battleground	NorthrendBG	Gate of the Yellow Moon
+4609	4384	607	battleground	NorthrendBG	Courtyard of the Ancients
+4610	4384	607	battleground	NorthrendBG	Landing Beach
+4611	4197	571	world	Northrend	Westspark Workshop
+4612	4197	571	world	Northrend	Eastspark Workshop
+4613	4395	571	world	Northrend	Dalaran City
+4614	4395	571	world	Northrend	The Violet Citadel Spire
+4615	210	571	world	Northrend	Naz'anak: The Forgotten Depths
+4616	4395	571	world	Northrend	Sunreaver's Sanctuary
+4617	1497	0	world	Azeroth	Elevator
+4618	4395	571	world	Northrend	Antonidas Memorial
+4619	4395	571	world	Northrend	The Violet Citadel
+4620	4395	571	world	Northrend	Magus Commerce Exchange
+4621	67	571	world	Northrend	UNUSED
+4622	210	571	world	Northrend	First Legion Forward Camp
+4623	4494	619	dungeon	Azjol_LowerCity	Hall of the Conquered Kings
+4624	4494	619	dungeon	Azjol_LowerCity	Befouled Terrace
+4625	4494	619	dungeon	Azjol_LowerCity	The Desecrated Altar
+4626	4494	619	dungeon	Azjol_LowerCity	Shimmering Bog
+4627	4494	619	dungeon	Azjol_LowerCity	Fallen Temple of Ahn'kahet
+4628	1583	229	dungeon	BlackRockSpire	Halls of Binding
+4629	67	571	world	Northrend	Winter's Heart
+4630	0	571	world	Northrend	The North Sea
+4631	67	571	world	Northrend	The Broodmother's Nest
+4632	4395	571	world	Northrend	Dalaran Floating Rocks
+4633	4196	600	dungeon	DrakTheronKeep	Raptor Pens
+4635	66	571	world	Northrend	Drak'Tharon Keep
+4636	4298	609	world	DeathKnightStart	The Noxious Pass
+4637	4395	571	world	Northrend	Vargoth's Retreat
+4638	4395	571	world	Northrend	Violet Citadel Balcony
+4639	3537	571	world	Northrend	Band of Variance
+4640	3537	571	world	Northrend	Band of Acceleration
+4641	3537	571	world	Northrend	Band of Transmutation
+4642	3537	571	world	Northrend	Band of Alignment
+4646	394	571	world	Northrend	Ashwood Lake
+4650	4273	603	raid	UlduarRaid	Iron Concourse
+4652	4273	603	raid	UlduarRaid	Formation Grounds
+4653	4273	603	raid	UlduarRaid	Razorscale's Aerie
+4654	4273	603	raid	UlduarRaid	The Colossal Forge
+4655	4273	603	raid	UlduarRaid	The Scrapyard
+4656	4273	603	raid	UlduarRaid	The Conservatory of Life
+4657	4273	603	raid	UlduarRaid	The Archivum
+4658	210	571	world	Northrend	Argent Tournament Grounds
+4665	4273	603	raid	UlduarRaid	Expedition Base Camp
+4666	210	571	world	Northrend	Sunreaver Pavilion
+4667	210	571	world	Northrend	Silver Covenant Pavilion
+4668	40	0	world	Azeroth	The Cooper Residence
+4669	210	571	world	Northrend	The Ring of Champions
+4670	210	571	world	Northrend	The Aspirants' Ring
+4671	210	571	world	Northrend	The Argent Valiants' Ring
+4672	210	571	world	Northrend	The Alliance Valiants' Ring
+4673	210	571	world	Northrend	The Horde Valiants' Ring
+4674	210	571	world	Northrend	Argent Pavilion
+4676	210	571	world	Northrend	Sunreaver Pavilion
+4677	210	571	world	Northrend	Silver Covenant Pavilion
+4679	1537	0	world	Azeroth	The Forlorn Cavern
+4688	151	451	world	development	claytonio test area
+4692	210	571	world	Northrend	Quel'Delar's Rest
+4710	0	628	battleground	IsleofConquest	Isle of Conquest
+4722	0	649	raid	ArgentTournamentRaid	Trial of the Crusader
+4723	0	650	dungeon	ArgentTournamentDungeon	Trial of the Champion
+4739	4395	571	world	Northrend	Runeweaver Square
+4740	4395	571	world	Northrend	The Silver Enclave
+4741	4710	628	battleground	IsleofConquest	Isle of Conquest No Man's Land
+4742	0	571	world	Northrend	Hrothgar's Landing
+4743	210	571	world	Northrend	Deathspeaker's Watch
+4747	4710	628	battleground	IsleofConquest	Workshop
+4748	4710	628	battleground	IsleofConquest	Quarry
+4749	4710	628	battleground	IsleofConquest	Docks
+4750	4710	628	battleground	IsleofConquest	Hangar
+4751	4710	628	battleground	IsleofConquest	Refinery
+4752	4710	628	battleground	IsleofConquest	Horde Keep
+4753	4710	628	battleground	IsleofConquest	Alliance Keep
+4760	4742	571	world	Northrend	The Sea Reaver's Run
+4763	0	641	world	Transport_AllianceAirshipBG	Transport: Alliance Gunship
+4764	0	642	world	Transport_HordeAirshipBG	Transport: Horde Gunship
+4769	4742	571	world	Northrend	Hrothgar's Landing
+4809	0	632	dungeon	IcecrownCitadel5Man	The Forge of Souls
+4812	0	631	raid	IcecrownCitadel	Icecrown Citadel
+4813	0	658	dungeon	QuarryofTears	Pit of Saron
+4820	0	668	dungeon	HallsOfReflection	Halls of Reflection
+4832	0	672	world	Transport197347	Transport: Alliance Gunship (IGB)
+4833	0	673	world	Transport197348	Transport: Horde Gunship (IGB)
+4859	4812	631	raid	IcecrownCitadel	The Frozen Throne
+4862	210	571	world	Northrend	The Frozen Halls
+4889	4812	631	raid	IcecrownCitadel	The Frost Queen's Lair
+4890	4812	631	raid	IcecrownCitadel	Putricide's Laboratory of Alchemical Horrors and Fun
+4891	4812	631	raid	IcecrownCitadel	The Sanctum of Blood
+4892	4812	631	raid	IcecrownCitadel	The Crimson Hall
+4893	0	631	raid	IcecrownCitadel	The Frost Queen's Lair
+4894	0	631	raid	IcecrownCitadel	Putricide's Laboratory of Alchemical Horrors and Fun
+4895	0	631	raid	IcecrownCitadel	The Crimson Hall
+4896	0	631	raid	IcecrownCitadel	The Frozen Throne
+4897	0	631	raid	IcecrownCitadel	The Sanctum of Blood
+4898	4896	631	raid	IcecrownCitadel	Frostmourne
+4904	4813	658	dungeon	QuarryofTears	The Dark Approach
+4905	4813	658	dungeon	QuarryofTears	Scourgelord's Command
+4906	4820	668	dungeon	HallsOfReflection	The Shadow Throne
+4908	4820	668	dungeon	HallsOfReflection	The Hidden Passage
+4910	4812	631	raid	IcecrownCitadel	Frostmourne
+4987	0	724	raid	ChamberofAspectsRed	The Ruby Sanctum

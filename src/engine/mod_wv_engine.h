@@ -32,22 +32,28 @@ namespace WeatherVibe
         WeatherEntry entry;
     };
 
-    // One stretch of a transition: a state shown while its grade moves from -> to.
+    // One stretch of a transition: a state shown while its grade goes from -> to.
+    //   streamed: the server moves the grade in small eased steps. Right for rain and for a
+    //             sky, which the client updates in place.
+    //   one shot: the grade is set to its end value at the start and left alone, because the
+    //             client restarts snow and sandstorm from nothing on every packet about them.
+    //             The client does the fading; the leg only waits for it.
     struct Leg
     {
         WeatherState state = WEATHER_STATE_FINE;
         float        from = 0.0f;
         float        to = 0.0f;
+        uint32       ms = 0;
+        bool         oneShot = false;
     };
 
-    // How to get from one weather to another. The grade moves continuously; the state id is
-    // swapped where the two legs meet, so there is no jump in what the client draws.
+    // How to get from one weather to another.
     struct TransitionPlan
     {
         Leg    legs[2];
-        uint8  legCount = 1;
-        float  split = 1.0f;       // share of the eased progress spent on the first leg
+        uint8  legCount = 0;
         uint32 durationMs = 0;
+        bool   keepGrade = false;   // nothing is to change on screen: stay at the current grade
     };
 
     enum class Phase : uint8 { HOLD, TRANSITION };
@@ -66,6 +72,7 @@ namespace WeatherVibe
         float        targetPct = 100.0f;
         float        targetRaw = 0.0f;
         WeatherState settledState = WEATHER_STATE_FINE;   // last state it came to rest on
+        DayPart      band = DayPart::MORNING;             // whose intensity band the target was mapped with
 
         Phase          phase = Phase::HOLD;
         TransitionPlan plan;
@@ -81,6 +88,7 @@ namespace WeatherVibe
         uint32 forcedMs = 0;
 
         uint32 resyncTimerMs = 0;     // next re-announce to hook listeners
+        uint32 thunderTimerMs = 0;    // next clap while a storm is up; 0 = none scheduled
         bool   dirty = false;         // changed since the last broadcast pass
     };
 
@@ -95,6 +103,12 @@ namespace WeatherVibe
         std::vector<uint32>       zoneIds;
         std::vector<uint32>       areaIds;
         std::vector<uint16>       neighbors;     // indices into the profile list
+
+        // What a row that says "Thunders" (86) means here: a storm in the profile's own weather.
+        WeatherState              thunderAs = WEATHER_STATE_THUNDERS;
+        std::vector<uint32>       thunderSounds; // this profile's own claps; empty = the global ones
+        WeatherSkins              skins;         // what its rain and sandstorm look like
+
         LiveState                 live;
     };
 }
@@ -104,7 +118,9 @@ namespace WeatherVibe
 // Owns the profiles, runs their weather, and decides who is told.
 //
 // Threading: Update() and every mutating call run on the world thread while the map threads are
-// idle. The zone/area hooks call Resolve()/SendCurrentTo() from map threads and only read.
+// idle. The zone/area hooks call Resolve()/SendCurrentTo() from map threads: they only read the
+// engine, and write nothing but the record of what was last sent, which lives with the player
+// they are running for.
 // ============================================================
 class WeatherVibeEngine
 {
@@ -121,11 +137,20 @@ public:
 
     // --- Delivery (read-only; safe from the zone/area hooks) ---
     WeatherVibe::Profile const* Resolve(uint32 zoneId, uint32 areaId) const;
-    void SendCurrentTo(Player* player, uint32 zoneId, uint32 areaId) const;
+    // enteredZone: the player has just changed zone. The core may have sent that client weather
+    // of its own on the way in, so what it was last told by the module is repeated where
+    // repeating is free (rain, a sky); snow and sandstorm are only ever sent on a change.
+    void SendCurrentTo(Player* player, uint32 zoneId, uint32 areaId, bool enteredZone = false) const;
     void OnAreaChange(Player* player, uint32 oldArea, uint32 newArea) const;
     void ForEachListener(WeatherVibe::Profile const& profile, std::function<void(Player*)> const& visit) const;
     // One-shot push to the clients in a zone the module has no profile for. Returns how many got it.
     uint32 PushToZone(uint32 zoneId, WeatherState state, float rawGrade) const;
+
+    // 86 means "this profile's kind of thunder"; every other state is itself.
+    static WeatherState ResolveThunder(WeatherVibe::Profile const& profile, WeatherState state)
+    {
+        return state == WEATHER_STATE_THUNDERS ? profile.thunderAs : state;
+    }
 
     // --- Commands (world thread) ---
     std::vector<WeatherVibe::Profile> const& GetProfiles() const { return _profiles; }
@@ -154,14 +179,22 @@ private:
     void UpdateProfile(WeatherVibe::Profile& profile, uint32 diff);
     void AdvanceTransition(WeatherVibe::Profile& profile, uint32 diff);
     void PickNext(WeatherVibe::Profile& profile);
-    void Begin(WeatherVibe::Profile& profile, WeatherState state, float pct);
+    // mayStay: a pick of the profile's own may decide nothing needs to change on screen (a
+    // re-pick of the same snow, say). A GM's request always takes effect.
+    void Begin(WeatherVibe::Profile& profile, WeatherState state, float pct, bool mayStay);
     void Settle(WeatherVibe::Profile& profile);
     void MarkDirty(WeatherVibe::Profile& profile);
     void FlushDirty();
 
+    // What the client is sent for a profile right now.
+    WeatherState WireOf(WeatherVibe::Profile const& profile) const
+    {
+        return sWeatherVibeCore.WireState(profile.live.state, profile.skins, profile.live.raw);
+    }
+
     void BuildTable(WeatherVibe::Profile const& profile, WeatherVibe::WeatherTable& out, bool useFronts) const;
-    WeatherVibe::TransitionPlan PlanTransition(WeatherVibe::TransitionSettings const& ts, DayPart dp,
-        WeatherState fromState, float fromRaw, WeatherState toState, float toPct, float toRaw) const;
+    WeatherVibe::TransitionPlan PlanTransition(WeatherVibe::Profile const& profile,
+        WeatherState fromState, float fromRaw, WeatherState toState, float toRaw, bool mayStay) const;
     uint32 CalcHoldMs(WeatherVibe::Profile const& profile, WeatherState state, uint32 transitionMs) const;
 
     void Debug(WeatherVibe::Profile const& profile, std::string const& line) const;
@@ -178,6 +211,9 @@ private:
     uint32 _tickMs = 4000;
     uint32 _reapplyMs = 0;
     uint32 _reapplyTimerMs = 0;
+    bool   _reapplyDue = false;         // the next broadcast pass repeats rain and sky to everyone
+    uint32 _reconcileTimerMs = 0;
+    bool   _reconcileDue = false;       // the next broadcast pass checks every client, changed or not
     float  _holdMult[WV_STATES];
     float  _dayPartWeight[WV_DAYPARTS][WV_STATES];
 

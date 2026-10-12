@@ -1,6 +1,7 @@
 #include "mod_weather_vibe.h"
 #include "mod_wv_core.h"
 #include "mod_wv_engine.h"
+#include "mod_wv_world.h"
 
 #include "Chat.h"
 #include "ChatCommand.h"
@@ -133,6 +134,9 @@ public:
 
             handler->SendSysMessage(sWeatherVibeEngine.Describe(*profile));
             handler->SendSysMessage("  covers: " + CoverageOf(*profile));
+            handler->SendSysMessage(Acore::StringFormat("  thunder here is {} | rain looks: {} | sandstorm looks: {}",
+                WeatherVibeCore::WeatherStateName(profile->thunderAs),
+                WeatherVibeCore::RainSkinName(profile->skins.rain), WeatherVibeCore::SandSkinName(profile->skins.sand)));
 
             if (!profile->neighbors.empty())
             {
@@ -225,8 +229,9 @@ public:
     }
 
     // ----------------------------------------------------------
-    // .wvibe setRaw <zoneId> <state> <raw:0..1>
-    // Calibration: snaps to a raw grade and stays there until released.
+    // .wvibe setRaw <zoneId> <state> <grade:0..1>
+    // Calibration: snaps to a client grade and stays there until released. The id sent is
+    // still chosen by the grade (WireState); `audition` is the way to see one exact id.
     // ----------------------------------------------------------
     static bool HandleWvibeSetRaw(ChatHandler* handler, uint32 zoneId, std::string stateToken, float rawGrade)
     {
@@ -363,6 +368,68 @@ public:
     }
 
     // ----------------------------------------------------------
+    // .wvibe audition <clientWeatherId> [raw:0..1]   |   .wvibe audition off
+    // Shows any weather id the client knows (Weather.dbc) to the caller alone. Nothing about
+    // the zone changes; the caller simply stops receiving its weather until "off".
+    // ----------------------------------------------------------
+    static bool HandleWvibeAudition(ChatHandler* handler, std::string idOrOff, Optional<float> rawGrade)
+    {
+        Player* player = handler->GetPlayer();
+        if (!player)
+            return Fail(handler, "In-game only.");
+
+        // Either way the client is about to show something the module did not send it.
+        WeatherVibeCore::Forget(player);
+
+        if (ToLower(idOrOff) == "off")
+        {
+            sWeatherVibeCore.SetAuditioning(player->GetGUID(), false);
+            sWeatherVibeEngine.SendCurrentTo(player, player->GetZoneId(), player->GetAreaId());
+            Reply(handler, "back to the weather of where you stand.");
+            return true;
+        }
+
+        uint32 weatherId = 0;
+        if (!ParseUInt(idOrOff, weatherId) || weatherId > 0xFFFF)
+            return Fail(handler, "Use .wvibe audition <clientWeatherId> [grade 0..1], or .wvibe audition off.");
+
+        float const grade = std::clamp(rawGrade.value_or(0.6f), 0.0f, 1.0f);
+
+        sWeatherVibeCore.SetAuditioning(player->GetGUID(), true);
+        WeatherVibeCore::SendWeather(player, WeatherState(weatherId), grade);
+
+        Reply(handler, Acore::StringFormat("showing client weather {} at grade {:.2f} ({:.0f}% of full density), to you only. "
+            "It stays until .wvibe audition off.", weatherId, grade, Density(grade) * 100.0f));
+        handler->SendSysMessage("  the id picks the sound; the grade what falls (nothing at or below 0.25) and how dark the sky is (full from 0.25)");
+        handler->SendSysMessage("  extra looks: 104 ash mist | 103 ember dust | 90 dark rain | 100 red rain | 86 rain + Dark Portal hum");
+        return true;
+    }
+
+    // ----------------------------------------------------------
+    // .wvibe lightning
+    // Drops one bolt close by, whether or not strikes are switched on, to see what it looks like.
+    // ----------------------------------------------------------
+    static bool HandleWvibeLightning(ChatHandler* handler)
+    {
+        if (!Ready(handler))
+            return false;
+
+        Player* player = handler->GetPlayer();
+        if (!player)
+            return Fail(handler, "In-game only.");
+
+        uint32 const entry = sWeatherVibeWorld.GetLightningEntry();
+
+        if (!sWeatherVibeWorld.StrikeLightningNear(player, 12.0f, 25.0f))
+            return Fail(handler, Acore::StringFormat("no bolt: you are indoors, there is no open ground within 25 yards, "
+                "or game object {} is not in the world DB.", entry));
+
+        Reply(handler, Acore::StringFormat("a bolt (game object {}) fell within 25 yards. Strikes during storms are {} "
+            "(WeatherVibe.Lightning.Enable).", entry, sWeatherVibeWorld.IsLightningEnabled() ? "on" : "off"));
+        return true;
+    }
+
+    // ----------------------------------------------------------
     // .wvibe simulate <here|profile> [hours]
     // ----------------------------------------------------------
     static bool HandleWvibeSimulate(ChatHandler* handler, std::string target, Optional<uint32> hours)
@@ -411,13 +478,16 @@ public:
         handler->SendSysMessage("  .wvibe where  (zone and area ids, and the profile that covers them)");
         handler->SendSysMessage("  .wvibe set [zoneId] [state] [pct:0..100]  (go there, then carry on)");
         handler->SendSysMessage("  .wvibe force [here|profile] [state] [pct] [minutes]  (go there and stay)");
-        handler->SendSysMessage("  .wvibe setRaw [zoneId] [state] [raw:0..1]  (calibration: snap and stay)");
+        handler->SendSysMessage("  .wvibe setRaw [zoneId] [state] [grade:0..1]  (calibration: snap to a client grade and stay)");
         handler->SendSysMessage("  .wvibe resume [here|profile|all]  |  .wvibe next [here|profile]");
         handler->SendSysMessage("  .wvibe simulate [here|profile] [hours]  |  .wvibe debug on|off  |  .wvibe reload");
+        handler->SendSysMessage("  .wvibe audition [clientWeatherId] [grade] | audition off  (look at any client weather, you only)");
+        handler->SendSysMessage("  .wvibe lightning  (drop one bolt beside you)");
         Reply(handler, "states (number or name):");
         handler->SendSysMessage("0 Fine | 1 Fog | 3 LightRain | 4 MediumRain | 5 HeavyRain");
         handler->SendSysMessage("6 LightSnow | 7 MediumSnow | 8 HeavySnow");
-        handler->SendSysMessage("22 LightSandstorm | 41 MediumSandstorm | 42 HeavySandstorm | 86 Thunders");
+        handler->SendSysMessage("22 LightSandstorm | 41 MediumSandstorm | 42 HeavySandstorm");
+        handler->SendSysMessage("86 Thunders (the storm that suits the place) | ThunderSnow | DryThunders");
         return true;
     }
 
@@ -439,6 +509,8 @@ public:
             { "resume",   HandleWvibeResume,   SEC_GAMEMASTER,    Console::Yes },
             { "next",     HandleWvibeNext,     SEC_GAMEMASTER,    Console::Yes },
             { "simulate", HandleWvibeSimulate, SEC_GAMEMASTER,    Console::Yes },
+            { "audition", HandleWvibeAudition, SEC_GAMEMASTER,    Console::No  },
+            { "lightning", HandleWvibeLightning, SEC_GAMEMASTER,  Console::No  },
             { "debug",    HandleWvibeDebug,    SEC_GAMEMASTER,    Console::No  },
             { "reload",   HandleWvibeReload,   SEC_ADMINISTRATOR, Console::Yes },
         };

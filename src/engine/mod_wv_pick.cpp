@@ -15,11 +15,33 @@ namespace WeatherVibe
             uint8  tier;
         };
 
-        Kind Classify(WeatherState state, bool thunderCoupled)
+        Kind Classify(WeatherState state, ThunderCoupling coupling)
         {
-            if (state == WEATHER_STATE_THUNDERS && thunderCoupled)
+            if (state == WEATHER_STATE_THUNDERS && coupling.rain)
                 return { Family::RAIN, 3 };
+            if (state == WV_STATE_THUNDER_SNOW && coupling.snow)
+                return { Family::SNOW, 3 };
             return { GetFamily(state), GetTier(state) };
+        }
+
+    }
+
+    Ground GroundOf(WeatherState state)
+    {
+        switch (state)
+        {
+        case WEATHER_STATE_LIGHT_RAIN:
+        case WEATHER_STATE_MEDIUM_RAIN:
+        case WEATHER_STATE_HEAVY_RAIN:
+        case WEATHER_STATE_THUNDERS:         return Ground::RAIN;
+        case WEATHER_STATE_LIGHT_SNOW:
+        case WEATHER_STATE_MEDIUM_SNOW:
+        case WEATHER_STATE_HEAVY_SNOW:
+        case WV_STATE_THUNDER_SNOW:          return Ground::SNOW;
+        case WEATHER_STATE_LIGHT_SANDSTORM:
+        case WEATHER_STATE_MEDIUM_SANDSTORM:
+        case WEATHER_STATE_HEAVY_SANDSTORM:  return Ground::SAND;
+        default:                             return Ground::SKY;   // Fine, Fog, DryThunders
         }
     }
 
@@ -37,7 +59,9 @@ namespace WeatherVibe
         case WEATHER_STATE_LIGHT_SANDSTORM:
         case WEATHER_STATE_MEDIUM_SANDSTORM:
         case WEATHER_STATE_HEAVY_SANDSTORM:  return Family::SANDSTORM;
-        case WEATHER_STATE_THUNDERS:         return Family::THUNDER;
+        case WEATHER_STATE_THUNDERS:
+        case WV_STATE_THUNDER_SNOW:
+        case WV_STATE_DRY_THUNDERS:          return Family::THUNDER;
         case WEATHER_STATE_FINE:
         default:                             return Family::FINE;
         }
@@ -62,25 +86,28 @@ namespace WeatherVibe
 
     bool IsContinuousPair(WeatherState a, WeatherState b)
     {
-        if (a == b)
-            return false;
-
-        if (GetTier(a) > 0 && GetTier(b) > 0)
-            return GetFamily(a) == GetFamily(b);
-
-        return (a == WEATHER_STATE_FINE && b == WEATHER_STATE_FOG) || (a == WEATHER_STATE_FOG && b == WEATHER_STATE_FINE);
+        return a != b && GroundOf(a) == GroundOf(b);
     }
 
-    bool IsThunderCoupled(WeatherTable const& table)
+    ThunderCoupling GetThunderCoupling(WeatherTable const& table)
     {
+        ThunderCoupling coupling;
+
         for (WeatherEntry const& entry : table)
-            if (entry.weight > 0.0f &&
-                (entry.state == WEATHER_STATE_MEDIUM_RAIN || entry.state == WEATHER_STATE_HEAVY_RAIN))
-                return true;
-        return false;
+        {
+            if (entry.weight <= 0.0f)
+                continue;
+
+            if (entry.state == WEATHER_STATE_MEDIUM_RAIN || entry.state == WEATHER_STATE_HEAVY_RAIN)
+                coupling.rain = true;
+            if (entry.state == WEATHER_STATE_MEDIUM_SNOW || entry.state == WEATHER_STATE_HEAVY_SNOW)
+                coupling.snow = true;
+        }
+
+        return coupling;
     }
 
-    bool IsNaturalTransition(WeatherState current, WeatherState candidate, bool thunderCoupled, bool strict)
+    bool IsNaturalTransition(WeatherState current, WeatherState candidate, ThunderCoupling coupling, bool strict)
     {
         if (candidate == current)
             return true;
@@ -101,8 +128,8 @@ namespace WeatherVibe
             return candidateTier == 1;
         }
 
-        Kind const from = Classify(current, thunderCoupled);
-        Kind const to = Classify(candidate, thunderCoupled);
+        Kind const from = Classify(current, coupling);
+        Kind const to = Classify(candidate, coupling);
 
         // Calm and light weather turn into one another freely: a clear sky, fog, thunder used
         // on its own, and the light tier of any rain, snow or sandstorm.
@@ -158,7 +185,7 @@ namespace WeatherVibe
             return -1;
 
         bool const strict = rules.strict;
-        bool const thunderCoupled = strict && IsThunderCoupled(table);
+        ThunderCoupling const coupling = strict ? GetThunderCoupling(table) : ThunderCoupling{};
 
         // Once a state has been picked maxConsecSame times running it is no longer offered.
         // Balancing (below) may still hold the weather where it is — a long blizzard is the
@@ -171,7 +198,7 @@ namespace WeatherVibe
             {
                 float total = 0.0f;
                 for (WeatherEntry const& entry : table)
-                    if (entry.weight > 0.0f && IsNaturalTransition(from, entry.state, thunderCoupled, strict))
+                    if (entry.weight > 0.0f && IsNaturalTransition(from, entry.state, coupling, strict))
                         total += entry.weight;
                 return total;
             };
@@ -192,7 +219,7 @@ namespace WeatherVibe
 
                 if (entry.weight <= 0.0f)
                     continue;
-                if (pass == 0 && !IsNaturalTransition(current, entry.state, thunderCoupled, strict))
+                if (pass == 0 && !IsNaturalTransition(current, entry.state, coupling, strict))
                     continue;
                 if (pass < 2 && wantChange && entry.state == current)
                     continue;

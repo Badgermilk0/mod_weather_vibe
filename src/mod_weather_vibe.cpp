@@ -32,14 +32,16 @@ void WeatherVibe_ApplyConfig(bool reload)
 // ============================================================
 // PlayerScript — tells a client the weather of where it now stands
 //
-// The zone and area hooks run inside map updates, possibly on a map thread: they only read.
+// The zone and area hooks run inside map updates, possibly on a map thread: they only read the
+// module's state, and write nothing but the player's own record of what it was last sent.
 // Bots have no client and are skipped.
 // ============================================================
 class WeatherVibe_PlayerScript : public PlayerScript
 {
 public:
     WeatherVibe_PlayerScript() : PlayerScript("WeatherVibe_PlayerScript",
-        { PLAYERHOOK_ON_LOGIN, PLAYERHOOK_ON_LOGOUT, PLAYERHOOK_ON_UPDATE_ZONE, PLAYERHOOK_ON_UPDATE_AREA }) {}
+        { PLAYERHOOK_ON_LOGIN, PLAYERHOOK_ON_LOGOUT, PLAYERHOOK_ON_UPDATE_ZONE, PLAYERHOOK_ON_UPDATE_AREA,
+          PLAYERHOOK_ON_MAP_CHANGED }) {}
 
     // The weather itself needs no push here: Player::UpdateZone runs during login and
     // reaches OnPlayerUpdateZone below.
@@ -52,6 +54,15 @@ public:
     void OnPlayerLogout(Player* player) override
     {
         sWeatherVibeCore.SetDebugSubscriber(player->GetGUID(), false);
+        sWeatherVibeCore.SetAuditioning(player->GetGUID(), false);
+    }
+
+    // A loading screen: the client starts its weather over, so the zone hook that follows
+    // must send whatever is up, even if it is what this client was last told.
+    void OnPlayerMapChanged(Player* player) override
+    {
+        if (WeatherVibeCore::HasClient(player))
+            WeatherVibeCore::Forget(player);
     }
 
     void OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newArea) override
@@ -59,7 +70,7 @@ public:
         if (!sWeatherVibeCore.IsEnabled() || !WeatherVibeCore::HasClient(player))
             return;
 
-        sWeatherVibeEngine.SendCurrentTo(player, newZone, newArea);
+        sWeatherVibeEngine.SendCurrentTo(player, newZone, newArea, true);
     }
 
     void OnPlayerUpdateArea(Player* player, uint32 oldArea, uint32 newArea) override

@@ -8,6 +8,8 @@
 #include <unordered_map>
 #include <vector>
 
+class Player;
+
 namespace WeatherVibe
 {
     struct Profile;
@@ -54,6 +56,20 @@ public:
     static WeatherTurn  ClassifyTurn(WeatherState previous, WeatherState now);
     static char const*  TurnName(WeatherTurn turn);
 
+    // --- Thunder. The client has no thunderstorm (see mod_wv_states.h): it draws the rain,
+    //     snow or dark sky, and the claps come from here. ---
+    bool   IsThunderEnabled() const { return _thunderEnabled; }
+    // Time to the next clap; shorter as the storm (0..1) builds.
+    uint32 NextThunderDelayMs(float intensity) const;
+    // One clap, the same for everyone standing in the profile. With lightning switched on, a
+    // listener may get a bolt nearby instead, which brings its own thunder.
+    void   Thunder(WeatherVibe::Profile const& profile, float intensity);
+    // Drops a lightning bolt on open ground between minDist and maxDist yards from the player.
+    // Works whether or not strikes are switched on, so `.wvibe lightning` can show one.
+    bool   StrikeLightningNear(Player* player, float minDist, float maxDist);
+    bool   IsLightningEnabled() const { return _lightningEnabled; }
+    uint32 GetLightningEntry() const { return _lightningEntry; }
+
 private:
     WeatherVibeWorld() = default;
 
@@ -61,6 +77,20 @@ private:
 
     bool   _hookEnabled = true;
     uint32 _resyncMs = 10 * 60 * 1000;
+
+    bool   _thunderEnabled = true;
+    uint32 _thunderMinMs = 12 * 1000;
+    uint32 _thunderMaxMs = 70 * 1000;
+    std::vector<uint32> _thunderNear;    // loud sound entries: a storm overhead
+    std::vector<uint32> _thunderFar;     // quiet ones: a storm some way off
+
+    bool   _lightningEnabled = false;
+    bool   _lightningBroken = false;     // the game object is missing from the world DB
+    uint32 _lightningEntry = 190569;     // "Acherus Lightning": a bolt model with positional thunder
+    float  _lightningChance = 35.0f;     // percent, per listener, per clap
+    uint32 _lightningDespawnSec = 3;
+    float  _lightningMinDist = 35.0f;
+    float  _lightningMaxDist = 90.0f;
 
     bool   _remarksEnabled = true;
     float  _remarkChance = 15.0f;        // percent, per player, per turn of the weather

@@ -24,8 +24,21 @@ using namespace WeatherVibe;
 
 namespace
 {
-    // A grade change smaller than this is not worth a packet.
-    constexpr float RAW_EPSILON = 0.004f;
+    // Snow and sandstorm: the client restarts the effect from nothing on every packet about
+    // it, so those are sent once per real change and the client is left to do the fading.
+    bool IsOneShot(Ground ground)
+    {
+        return ground == Ground::SNOW || ground == Ground::SAND;
+    }
+
+    // How often every client's last packet is checked against what it should be showing.
+    constexpr uint32 RECONCILE_MS = 20000;
+
+    // How long the client itself takes to get from one grade to another.
+    uint32 ClientFadeMs(float from, float to)
+    {
+        return uint32(std::fabs(to - from) / CLIENT_GRADE_PER_SECOND * 1000.0f);
+    }
 
     // Parse "weight,state,minPct,maxPct" from a config value.
     bool ParseProfileEntry(std::string const& raw, WeatherEntry& out, bool& swapped)
@@ -51,25 +64,34 @@ namespace
         return out.weight > 0.0f;
     }
 
-    // Where a transition stands at progress t (0..1): eased, so it starts and ends gently.
-    void Evaluate(TransitionPlan const& plan, float t, WeatherState& state, float& raw)
+    // Where a transition stands after elapsedMs. A streamed leg is eased, so it starts and
+    // ends gently; a one-shot leg is at its end value from its first moment.
+    void Evaluate(TransitionPlan const& plan, uint32 elapsedMs, WeatherState& state, float& raw)
     {
-        t = std::clamp(t, 0.0f, 1.0f);
-        float const eased = t * t * (3.0f - 2.0f * t);
+        uint32 legStart = 0;
 
-        if (plan.legCount < 2 || eased < plan.split)
+        for (uint8 i = 0; i < plan.legCount; ++i)
         {
-            Leg const& leg = plan.legs[0];
-            float const k = (plan.legCount < 2) ? eased : eased / plan.split;
+            Leg const& leg = plan.legs[i];
+            bool const last = (i + 1 == plan.legCount);
+
+            if (!last && elapsedMs >= legStart + leg.ms)
+            {
+                legStart += leg.ms;
+                continue;
+            }
+
             state = leg.state;
-            raw = leg.from + (leg.to - leg.from) * k;
+            if (leg.oneShot || !leg.ms)
+            {
+                raw = leg.to;
+                return;
+            }
+
+            float const t = std::clamp(float(elapsedMs - legStart) / float(leg.ms), 0.0f, 1.0f);
+            raw = leg.from + (leg.to - leg.from) * (t * t * (3.0f - 2.0f * t));
             return;
         }
-
-        Leg const& leg = plan.legs[1];
-        float const k = (eased - plan.split) / (1.0f - plan.split);
-        state = leg.state;
-        raw = leg.from + (leg.to - leg.from) * k;
     }
 
     std::string Duration(uint32 ms)
@@ -133,7 +155,7 @@ void WeatherVibeEngine::LoadGlobals(ConfigView const& cfg)
         1.00f, 1.00f, 0.75f,   // rain
         1.00f, 1.00f, 0.75f,   // snow
         1.00f, 1.00f, 0.75f,   // sandstorm
-        0.60f                  // Thunders
+        0.60f, 0.60f, 0.60f    // Thunders, ThunderSnow, DryThunders
     };
 
     for (size_t i = 0; i < WV_STATES; ++i)
@@ -147,6 +169,26 @@ void WeatherVibeEngine::LoadGlobals(ConfigView const& cfg)
             std::string key = std::string("WeatherVibe.DayPartWeight.")
                 + WeatherVibeCore::DayPartTokenUpper(DayPart(dp)) + "." + stateName;
             _dayPartWeight[dp][i] = std::max(0.0f, cfg.Float(key, 1.0f));
+        }
+    }
+
+    // Thunder is thunder: unless the conf says otherwise, thundersnow and dry storms keep the
+    // hours and the staying power set for Thunders.
+    size_t const thunders = size_t(WeatherVibeCore::StateIndex(WEATHER_STATE_THUNDERS));
+    for (WeatherState kind : { WV_STATE_THUNDER_SNOW, WV_STATE_DRY_THUNDERS })
+    {
+        size_t const i = size_t(WeatherVibeCore::StateIndex(kind));
+        char const* kindName = WeatherVibeCore::WeatherStateName(kind);
+
+        if (!cfg.Has(std::string("WeatherVibe.Hold.") + kindName))
+            _holdMult[i] = _holdMult[thunders];
+
+        for (size_t dp = 0; dp < WV_DAYPARTS; ++dp)
+        {
+            std::string key = std::string("WeatherVibe.DayPartWeight.")
+                + WeatherVibeCore::DayPartTokenUpper(DayPart(dp)) + "." + kindName;
+            if (!cfg.Has(key))
+                _dayPartWeight[dp][i] = _dayPartWeight[dp][thunders];
         }
     }
 }
@@ -211,6 +253,54 @@ bool WeatherVibeEngine::LoadProfile(ConfigView const& cfg, Profile& profile) con
                 : _dayPartWeight[dp][i];
         }
     }
+
+    // ── Thunder: a storm in the profile's own weather. With rain in its tables it is a
+    //    rainstorm, with only snow it is thundersnow, with neither a dry storm. ──
+    bool hasRain = false, hasSnow = false;
+    for (WeatherTable const& table : profile.seasons)
+    {
+        for (WeatherEntry const& entry : table)
+        {
+            if (GetTier(entry.state) == 0)
+                continue;
+            if (GetFamily(entry.state) == Family::RAIN) hasRain = true;
+            if (GetFamily(entry.state) == Family::SNOW) hasSnow = true;
+        }
+    }
+
+    profile.thunderAs = hasRain ? WEATHER_STATE_THUNDERS : hasSnow ? WV_STATE_THUNDER_SNOW : WV_STATE_DRY_THUNDERS;
+
+    std::string const style = ToLower(cfg.Text(base + "Thunder.Style", "auto"));
+    if (style == "rain")      profile.thunderAs = WEATHER_STATE_THUNDERS;
+    else if (style == "snow") profile.thunderAs = WV_STATE_THUNDER_SNOW;
+    else if (style == "dry")  profile.thunderAs = WV_STATE_DRY_THUNDERS;
+    else if (style != "auto")
+        LOG_WARN("server.loading", "[WeatherVibe] '{}Thunder.Style = {}' is not rain, snow, dry or auto", base, style);
+
+    for (WeatherTable& table : profile.seasons)
+        for (WeatherEntry& entry : table)
+            entry.state = ResolveThunder(profile, entry.state);
+
+    profile.thunderSounds.clear();
+    for (std::string const& token : Split(cfg.Text(base + "Thunder.Sounds"), ','))
+    {
+        uint32 soundId = 0;
+        if (token.empty())
+            continue;
+        if (ParseUInt(token, soundId) && soundId)
+            profile.thunderSounds.push_back(soundId);
+        else
+            LOG_WARN("server.loading", "[WeatherVibe] '{}Thunder.Sounds' has '{}', which is not a sound id", base, token);
+    }
+
+    // ── Skins: what its rain and its sandstorm look like ──
+    std::string skin = cfg.Text(base + "Rain.Skin");
+    if (!skin.empty() && !WeatherVibeCore::ParseRainSkin(skin, profile.skins.rain))
+        LOG_WARN("server.loading", "[WeatherVibe] '{}Rain.Skin = {}' is not rain, dark or red", base, skin);
+
+    skin = cfg.Text(base + "Sandstorm.Skin");
+    if (!skin.empty() && !WeatherVibeCore::ParseSandSkin(skin, profile.skins.sand))
+        LOG_WARN("server.loading", "[WeatherVibe] '{}Sandstorm.Skin = {}' is not sand, ash or ember", base, skin);
 
     return true;
 }
@@ -372,6 +462,7 @@ void WeatherVibeEngine::Load(ConfigView const& cfg, bool reload)
                 continue;
             }
 
+            holiday.entry.state = ResolveThunder(*profile, holiday.entry.state);
             profile->holidays.push_back(holiday);
         }
     }
@@ -495,9 +586,10 @@ void WeatherVibeEngine::WarmStart(Profile& profile)
     }
 
     live.started = true;
+    live.band = sWeatherVibeCore.GetCurrentDayPart();
     live.state = live.targetState = live.settledState = state;
     live.targetPct = pct;
-    live.raw = live.targetRaw = sWeatherVibeCore.PercentToRaw(sWeatherVibeCore.GetCurrentDayPart(), state, pct);
+    live.raw = live.targetRaw = sWeatherVibeCore.PercentToRaw(live.band, state, pct);
     live.phase = Phase::HOLD;
     live.holdMs = uint32(float(CalcHoldMs(profile, state, 0)) * frand(0.15f, 1.0f));
 }
@@ -569,11 +661,9 @@ void WeatherVibeEngine::BuildTable(Profile const& profile, WeatherTable& out, bo
         if (!other.started)
             continue;
 
-        if (other.targetState == WEATHER_STATE_THUNDERS)
-        {
-            rain += 1.0f;
-            continue;
-        }
+        // A storm next door counts as the heavy weather it is drawn as; a dry one carries nothing.
+        if (other.targetState == WEATHER_STATE_THUNDERS) { rain += 1.0f; continue; }
+        if (other.targetState == WV_STATE_THUNDER_SNOW)  { snow += 1.0f; continue; }
 
         if (GetTier(other.targetState) < 2)
             continue;
@@ -595,10 +685,13 @@ void WeatherVibeEngine::BuildTable(Profile const& profile, WeatherTable& out, bo
 
         switch (GetFamily(entry.state))
         {
-        case Family::RAIN:
-        case Family::THUNDER:   pressure = rain / count; break;
+        case Family::RAIN:      pressure = rain / count; break;
         case Family::SNOW:      pressure = snow / count; break;
         case Family::SANDSTORM: pressure = sand / count; break;
+        case Family::THUNDER:
+            if (entry.state == WEATHER_STATE_THUNDERS)     pressure = rain / count;
+            else if (entry.state == WV_STATE_THUNDER_SNOW) pressure = snow / count;
+            break;
         default: break;
         }
 
@@ -610,61 +703,111 @@ void WeatherVibeEngine::BuildTable(Profile const& profile, WeatherTable& out, bo
 // Scheduling & transition
 // ─────────────────────────────────────────────────────────────
 
-// Plan the way from one weather to another in raw-grade space.
-//   same state:       the grade simply moves.
-//   continuous pair:  the grade moves straight across and the state id swaps halfway — Light at
-//                     0.45 and Medium at 0.45 draw the same density, so nothing jumps.
-//   anything else:    the old weather eases to its faintest, the new one builds from its faintest.
-//                     For Fine "faintest" is its most overcast, which is where precipitation starts.
-// The duration still comes from the profile's Step.* keys: one old-style step per StepSize.Perc
-// of intensity travelled.
-TransitionPlan WeatherVibeEngine::PlanTransition(TransitionSettings const& ts, DayPart dp,
-    WeatherState fromState, float fromRaw, WeatherState toState, float toPct, float toRaw) const
+// Plan the way from one weather to another, as the client will actually show it.
+//
+// The client draws nothing at or below grade 0.25 (the floor) and has the sky fully stormy from
+// there up, so the floor is where every kind of weather meets every other: a sky clouds over
+// up to it, precipitation thins down to it.
+//
+//   same kind of thing on screen (two rains, two skies):
+//       the grade moves straight across; nothing restarts. The state swaps halfway.
+//   one kind to another:
+//       the old one is eased to the floor, the new one builds from it.
+//
+// Rain and a sky are streamed in small steps. Snow and sandstorm cannot be: the client restarts
+// them from nothing on every packet, so they get one packet with the final grade, and when
+// they are what is being left, no packet at all — the client fades them by itself the moment
+// it is told about anything else.
+//
+// A streamed leg is paced by the profile's Step.* keys: one step of time per StepSize.Perc of
+// the range it crosses (a sky's range is the first quarter of the grade, precipitation's the
+// rest), and never faster than the client's own 0.1 per second.
+TransitionPlan WeatherVibeEngine::PlanTransition(Profile const& profile, WeatherState fromState, float fromRaw,
+    WeatherState toState, float toRaw, bool mayStay) const
 {
+    TransitionSettings const& ts = profile.transition;
     TransitionPlan plan;
-    float const fromPct = sWeatherVibeCore.RawToPercent(dp, fromState, fromRaw);
-    float travelPct = 0.0f;
 
-    if (fromState == toState)
+    Ground const here = GroundOf(fromState);
+    Ground const there = GroundOf(toState);
+    float const floor = CLIENT_PARTICLE_FLOOR;
+
+    auto stream = [&](WeatherState state, float from, float to)
+        {
+            if (std::fabs(to - from) < GRADE_EPSILON)
+                return;
+
+            Leg& leg = plan.legs[plan.legCount++];
+            leg.state = state;
+            leg.from = from;
+            leg.to = to;
+
+            float const span = (GroundOf(state) == Ground::SKY) ? floor : (1.0f - floor);
+            float const travelPct = std::fabs(to - from) / span * 100.0f;
+            uint32 const steps = std::max(1u, uint32(std::ceil(travelPct / ts.stepSizePct)));
+            for (uint32 i = 0; i < steps; ++i)
+                leg.ms += urand(ts.stepTimeMinMs, ts.stepTimeMaxMs);
+
+            // An eased leg moves half as fast again at its middle as on average.
+            leg.ms = std::max(leg.ms, uint32(float(ClientFadeMs(from, to)) * 1.5f));
+            plan.durationMs += leg.ms;
+        };
+
+    auto oneShot = [&](WeatherState state, float from, float to)
+        {
+            Leg& leg = plan.legs[plan.legCount++];
+            leg.state = state;
+            leg.from = from;
+            leg.to = to;
+            leg.oneShot = true;
+
+            // The client's own doing: whatever was falling fades out, the effect is rebuilt,
+            // the new grade fades in. Wait that long, and a little for the last particles.
+            leg.ms = ClientFadeMs(std::max(from, floor), floor) + ClientFadeMs(floor, std::max(to, floor)) + 4000;
+            plan.durationMs += leg.ms;
+        };
+
+    bool const sameGrade = std::fabs(toRaw - fromRaw) < GRADE_EPSILON;
+
+    if (here == there)
     {
-        if (std::fabs(toRaw - fromRaw) < RAW_EPSILON)
-            return plan;   // already there
+        if (IsOneShot(there))
+        {
+            // More of the same snow or sandstorm. A packet costs a visible restart, so one is
+            // only spent on a change worth seeing or hearing: a profile's own re-pick of the
+            // same state stays as it is, and so does a nudge within one sound loop.
+            bool const sameLoop = sWeatherVibeCore.WireState(fromState, profile.skins, fromRaw)
+                == sWeatherVibeCore.WireState(toState, profile.skins, toRaw);
 
-        plan.legCount = 1;
-        plan.split = 1.0f;
-        plan.legs[0] = { toState, fromRaw, toRaw };
-        travelPct = std::fabs(toPct - fromPct);
+            if (!sameGrade && mayStay && (fromState == toState || (sameLoop && std::fabs(toRaw - fromRaw) < RESTART_NOT_WORTH)))
+                plan.keepGrade = true;
+            else if (!sameGrade)
+                oneShot(toState, fromRaw, toRaw);
+
+            return plan;
+        }
+
+        if (fromState == toState)
+            stream(toState, fromRaw, toRaw);
+        else
+        {
+            float const middle = (fromRaw + toRaw) * 0.5f;
+            stream(fromState, fromRaw, middle);
+            stream(toState, middle, toRaw);
+        }
+
+        return plan;
     }
-    else if (IsContinuousPair(fromState, toState))
-    {
-        float const middle = (fromRaw + toRaw) * 0.5f;
 
-        plan.legCount = 2;
-        plan.split = 0.5f;
-        plan.legs[0] = { fromState, fromRaw, middle };
-        plan.legs[1] = { toState, middle, toRaw };
+    // Leaving. (A sky only ever leaves for precipitation here, so "to the floor" is clouding over.)
+    if (!IsOneShot(here))
+        stream(fromState, fromRaw, floor);
 
-        // The two states' percentages are not on one scale, so pace this by the grade itself:
-        // a change of kind is worth a few steps on its own, a full band's travel about as many again.
-        travelPct = 30.0f + std::min(100.0f, std::fabs(toRaw - fromRaw) * 250.0f);
-    }
+    // Arriving.
+    if (IsOneShot(there))
+        oneShot(toState, IsOneShot(here) ? fromRaw : floor, toRaw);
     else
-    {
-        float const exitRaw = sWeatherVibeCore.PercentToRaw(dp, fromState, 0.0f);
-        float const entryRaw = sWeatherVibeCore.PercentToRaw(dp, toState, 0.0f);
-        float const out = std::fabs(fromRaw - exitRaw);
-        float const in = std::fabs(toRaw - entryRaw);
-
-        plan.legCount = 2;
-        plan.split = (out + in > 0.0001f) ? std::clamp(out / (out + in), 0.15f, 0.85f) : 0.5f;
-        plan.legs[0] = { fromState, fromRaw, exitRaw };
-        plan.legs[1] = { toState, entryRaw, toRaw };
-        travelPct = fromPct + toPct;
-    }
-
-    uint32 const steps = std::max(1u, uint32(std::ceil(travelPct / ts.stepSizePct)));
-    for (uint32 i = 0; i < steps; ++i)
-        plan.durationMs += urand(ts.stepTimeMinMs, ts.stepTimeMaxMs);
+        stream(toState, floor, toRaw);
 
     return plan;
 }
@@ -692,17 +835,29 @@ void WeatherVibeEngine::MarkDirty(Profile& profile)
     _anyDirty = true;
 }
 
-void WeatherVibeEngine::Begin(Profile& profile, WeatherState state, float pct)
+void WeatherVibeEngine::Begin(Profile& profile, WeatherState state, float pct, bool mayStay)
 {
     LiveState& live = profile.live;
     DayPart const dp = sWeatherVibeCore.GetCurrentDayPart();
 
+    // A GM asking for 86 gets this profile's kind of thunder, as its own rows do.
+    state = ResolveThunder(profile, state);
+
     // The daypart's band is applied here, once: a hold does not shift when the clock crosses
     // into the next daypart.
+    live.band = dp;
     live.targetState = state;
     live.targetPct = std::clamp(pct, 0.0f, 100.0f);
     live.targetRaw = sWeatherVibeCore.PercentToRaw(dp, state, live.targetPct);
-    live.plan = PlanTransition(profile.transition, dp, live.state, live.raw, state, live.targetPct, live.targetRaw);
+    live.plan = PlanTransition(profile, live.state, live.raw, state, live.targetRaw, mayStay);
+
+    if (live.plan.keepGrade)
+    {
+        // Snow or sandstorm that is close enough to what is already falling: leave it be.
+        live.targetRaw = live.raw;
+        live.targetPct = sWeatherVibeCore.RawToPercent(dp, state, live.raw);
+    }
+
     live.holdMs = CalcHoldMs(profile, state, live.plan.durationMs);
     live.elapsedMs = 0;
     live.tickTimerMs = 0;
@@ -718,13 +873,16 @@ void WeatherVibeEngine::Settle(Profile& profile)
     LiveState& live = profile.live;
     WeatherState const previous = live.settledState;
 
+    // After a one-shot leg, or a pick that stays as it is, there is nothing new to show.
+    if (live.state != live.targetState || std::fabs(live.raw - live.targetRaw) >= GRADE_EPSILON)
+        MarkDirty(profile);
+
     live.phase = Phase::HOLD;
     live.state = live.targetState;
     live.raw = live.targetRaw;
     live.settledState = live.targetState;
-    MarkDirty(profile);
 
-    Debug(profile, Acore::StringFormat("settled on {} {:.0f}% (raw {:.2f}), {}",
+    Debug(profile, Acore::StringFormat("settled on {} {:.0f}% (grade {:.2f}), {}",
         WeatherVibeCore::WeatherStateName(live.state), live.targetPct, live.raw,
         live.forced ? std::string("locked") : "holding " + Duration(live.holdMs)));
 
@@ -751,9 +909,9 @@ void WeatherVibeEngine::AdvanceTransition(Profile& profile, uint32 diff)
 
     WeatherState state = live.state;
     float raw = live.raw;
-    Evaluate(live.plan, float(live.elapsedMs) / float(live.plan.durationMs), state, raw);
+    Evaluate(live.plan, live.elapsedMs, state, raw);
 
-    if (state != live.state || std::fabs(raw - live.raw) >= RAW_EPSILON)
+    if (state != live.state || std::fabs(raw - live.raw) >= GRADE_EPSILON)
     {
         live.state = state;
         live.raw = raw;
@@ -780,12 +938,14 @@ void WeatherVibeEngine::PickNext(Profile& profile)
     WeatherState const from = live.settledState;
 
     live.consecSame = (entry.state == from) ? live.consecSame + 1 : 1;
-    Begin(profile, entry.state, frand(entry.minPct, entry.maxPct));
+    Begin(profile, entry.state, frand(entry.minPct, entry.maxPct), true);
 
     if (live.phase == Phase::TRANSITION)
-        Debug(profile, Acore::StringFormat("{} -> {} {:.0f}% over {}, then holding {}",
+        Debug(profile, Acore::StringFormat("{} -> {} {:.0f}% over {}{}, then holding {}",
             WeatherVibeCore::WeatherStateName(from), WeatherVibeCore::WeatherStateName(live.targetState),
-            live.targetPct, Duration(live.plan.durationMs), Duration(live.holdMs)));
+            live.targetPct, Duration(live.plan.durationMs),
+            live.plan.legs[live.plan.legCount - 1].oneShot ? " (sent once; the client fades it)" : "",
+            Duration(live.holdMs)));
 }
 
 void WeatherVibeEngine::UpdateProfile(Profile& profile, uint32 diff)
@@ -805,6 +965,27 @@ void WeatherVibeEngine::UpdateProfile(Profile& profile, uint32 diff)
         else
             live.resyncTimerMs -= diff;
     }
+
+    // A storm is on screen: the client only draws the rain, snow or dark sky, so the thunder
+    // is ours to play. Claps come closer together as the storm builds.
+    if (WeatherVibeCore::IsThunder(live.state) && sWeatherVibeWorld.IsThunderEnabled())
+    {
+        if (live.thunderTimerMs > diff)
+            live.thunderTimerMs -= diff;
+        else
+        {
+            float const intensity = sWeatherVibeCore.RawToPercent(live.band, live.state, live.raw) / 100.0f;
+
+            // 0 means the storm has only just come up: wait part of a gap before the first one.
+            if (live.thunderTimerMs)
+                sWeatherVibeWorld.Thunder(profile, intensity);
+
+            uint32 const gap = sWeatherVibeWorld.NextThunderDelayMs(intensity);
+            live.thunderTimerMs = std::max(1u, live.thunderTimerMs ? gap : gap / 2);
+        }
+    }
+    else
+        live.thunderTimerMs = 0;
 
     if (live.forced && live.forcedTimed)
     {
@@ -848,13 +1029,22 @@ void WeatherVibeEngine::Update(uint32 diff)
         if (_reapplyTimerMs <= diff)
         {
             _reapplyTimerMs = _reapplyMs;
-            for (Profile& profile : _profiles)
-                if (profile.live.started)
-                    MarkDirty(profile);
+            _reapplyDue = true;
         }
         else
             _reapplyTimerMs -= diff;
     }
+
+    // Snow and sandstorm are sent once, so a client that missed that one packet would keep the
+    // old weather until the next change. Every so often each client's record is held against
+    // what it should be showing; nothing is sent to the ones that are right.
+    if (_reconcileTimerMs <= diff)
+    {
+        _reconcileTimerMs = RECONCILE_MS;
+        _reconcileDue = true;
+    }
+    else
+        _reconcileTimerMs -= diff;
 
     for (Profile& profile : _profiles)
         UpdateProfile(profile, diff);
@@ -871,24 +1061,34 @@ void WeatherVibeEngine::Update(uint32 diff)
 // found wherever they are — continent, battleground or raid.
 void WeatherVibeEngine::FlushDirty()
 {
-    if (!_anyDirty)
+    if (!_anyDirty && !_reapplyDue && !_reconcileDue)
         return;
+
+    bool const everyone = _reapplyDue || _reconcileDue;
+    Tell const unchanged = _reapplyDue ? Tell::REPEAT : Tell::ARRIVAL;
 
     for (auto const& [accountId, session] : sWorldSessionMgr->GetAllSessions())
     {
+        // A player between maps is told on arrival, by the zone hook.
         Player* player = session->GetPlayer();
-        if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->IsBeingTeleported())
+        if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->IsBeingTeleportedFar())
+            continue;
+
+        if (sWeatherVibeCore.IsAuditioning(player->GetGUID()))
             continue;
 
         Profile const* profile = Resolve(player->GetZoneId(), player->GetAreaId());
-        if (profile && profile->live.dirty)
-            WeatherVibeCore::SendWeather(player, profile->live.state, profile->live.raw);
+        if (profile && (everyone || profile->live.dirty))
+            WeatherVibeCore::Deliver(player, WireOf(*profile), profile->live.raw,
+                profile->live.dirty ? Tell::CHANGE : unchanged);
     }
 
     for (Profile& profile : _profiles)
         profile.live.dirty = false;
 
     _anyDirty = false;
+    _reapplyDue = false;
+    _reconcileDue = false;
 }
 
 // An area's own profile beats its zone's.
@@ -908,21 +1108,35 @@ Profile const* WeatherVibeEngine::Resolve(uint32 zoneId, uint32 areaId) const
     return nullptr;
 }
 
-void WeatherVibeEngine::SendCurrentTo(Player* player, uint32 zoneId, uint32 areaId) const
+void WeatherVibeEngine::SendCurrentTo(Player* player, uint32 zoneId, uint32 areaId, bool enteredZone) const
 {
+    // A GM looking at a weather id with `.wvibe audition` keeps it until they switch it off.
+    if (sWeatherVibeCore.IsAuditioning(player->GetGUID()))
+        return;
+
     if (Profile const* profile = Resolve(zoneId, areaId))
     {
-        WeatherVibeCore::SendWeather(player, profile->live.state, profile->live.raw);
+        // With the core's weather left on, it has just sent this client a packet of its own:
+        // whatever the module said last no longer stands.
+        if (enteredZone && sWeatherVibeCore.CoreWeatherIsOn())
+            WeatherVibeCore::Forget(player);
+
+        // Walking from one zone into another on the same profile sends nothing new to a client
+        // in snow, which is the point: a packet would make the snow fade out and come back.
+        WeatherVibeCore::Deliver(player, WireOf(*profile), profile->live.raw, enteredZone ? Tell::REPEAT : Tell::ARRIVAL);
         return;
     }
 
     // Not a place the module runs. The client keeps showing the last zone's weather until told
     // otherwise, so clear it — then let the core repeat any weather a script set for this zone
-    // (a boss storm, an event), which that clear would otherwise have wiped.
+    // (a boss storm, an event), which that clear would otherwise have wiped. What the client
+    // shows now is no longer the module's to know.
     WeatherVibeCore::SendWeather(player, WEATHER_STATE_FINE, 0.0f);
 
     if (Map* map = player->FindMap())
         map->SendZoneWeather(zoneId, player);
+
+    WeatherVibeCore::Forget(player);
 }
 
 void WeatherVibeEngine::OnAreaChange(Player* player, uint32 oldArea, uint32 newArea) const
@@ -962,7 +1176,8 @@ uint32 WeatherVibeEngine::PushToZone(uint32 zoneId, WeatherState state, float ra
         if (!player || !player->IsInWorld() || session->IsSocketClosed() || player->GetZoneId() != zoneId)
             continue;
 
-        WeatherVibeCore::SendWeather(player, state, rawGrade);
+        WeatherVibeCore::SendWeather(player, sWeatherVibeCore.WireState(state, WeatherSkins{}, rawGrade), rawGrade);
+        WeatherVibeCore::Forget(player);
         ++count;
     }
 
@@ -998,7 +1213,7 @@ void WeatherVibeEngine::Steer(Profile& profile, WeatherState state, float pct)
     live.forcedMs = 0;
     live.consecSame = 1;
 
-    Begin(profile, state, pct);
+    Begin(profile, state, pct, false);
 }
 
 void WeatherVibeEngine::Force(Profile& profile, WeatherState state, float pct, uint32 minutes)
@@ -1010,7 +1225,7 @@ void WeatherVibeEngine::Force(Profile& profile, WeatherState state, float pct, u
     live.forcedMs = minutes * 60000;
     live.consecSame = 1;
 
-    Begin(profile, state, pct);
+    Begin(profile, state, pct, false);
     live.holdMs = 0;   // once released, the profile picks again straight away
 }
 
@@ -1022,10 +1237,13 @@ void WeatherVibeEngine::ForceRaw(Profile& profile, WeatherState state, float raw
     live.forcedTimed = false;
     live.forcedMs = 0;
 
+    state = ResolveThunder(profile, state);
+
     live.phase = Phase::HOLD;
+    live.band = sWeatherVibeCore.GetCurrentDayPart();
     live.state = live.targetState = live.settledState = state;
     live.raw = live.targetRaw = WeatherVibeCore::ClampRaw(state, rawGrade);
-    live.targetPct = sWeatherVibeCore.RawToPercent(sWeatherVibeCore.GetCurrentDayPart(), state, live.raw);
+    live.targetPct = sWeatherVibeCore.RawToPercent(live.band, state, live.raw);
     live.holdMs = 0;
     live.consecSame = 1;
     MarkDirty(profile);
@@ -1054,15 +1272,13 @@ std::string WeatherVibeEngine::Describe(Profile const& profile) const
     if (!live.started)
         return profile.name + ": not running (no usable weather entries)";
 
-    DayPart const dp = sWeatherVibeCore.GetCurrentDayPart();
-
-    std::string out = Acore::StringFormat("{}: {} {:.0f}% (raw {:.2f})", profile.name,
+    std::string out = Acore::StringFormat("{}: {} {:.0f}%", profile.name,
         WeatherVibeCore::WeatherStateName(live.state),
-        sWeatherVibeCore.RawToPercent(dp, live.state, live.raw), live.raw);
+        sWeatherVibeCore.RawToPercent(live.band, live.state, live.raw));
 
     if (live.phase == Phase::TRANSITION)
-        out += Acore::StringFormat(" -> {} {:.0f}% (raw {:.2f}), {} to go",
-            WeatherVibeCore::WeatherStateName(live.targetState), live.targetPct, live.targetRaw,
+        out += Acore::StringFormat(" -> {} {:.0f}%, {} to go",
+            WeatherVibeCore::WeatherStateName(live.targetState), live.targetPct,
             Duration(live.plan.durationMs - std::min(live.elapsedMs, live.plan.durationMs)));
     else if (!live.forced && _autoEngine)
         out += ", next change in " + Duration(live.holdMs);
@@ -1071,6 +1287,17 @@ std::string WeatherVibeEngine::Describe(Profile const& profile) const
         out += live.forcedTimed ? " [locked for " + Duration(live.forcedMs) + "]" : " [locked until .wvibe resume]";
     else if (!_autoEngine)
         out += " [profiles are off: manual only]";
+
+    // What that is to the client: the id picks the sound, the grade what is drawn.
+    WeatherState const wire = WireOf(profile);
+    out += Acore::StringFormat(" | client: id {} at grade {:.2f}, ", uint32(wire), live.raw);
+
+    if (GroundOf(live.state) == Ground::SKY)
+        out += Acore::StringFormat("sky {:.0f}% stormy", std::min(live.raw, CLIENT_PARTICLE_FLOOR) / CLIENT_PARTICLE_FLOOR * 100.0f);
+    else if (wire == WEATHER_STATE_FINE)
+        out += "stormy sky, too little falling to send";
+    else
+        out += Acore::StringFormat("{:.0f}% of full density", Density(live.raw) * 100.0f);
 
     return out;
 }
@@ -1104,17 +1331,25 @@ std::array<float, WV_STATES> WeatherVibeEngine::Simulate(Profile const& profile,
         float const pct = frand(entry.minPct, entry.maxPct);
         float const toRaw = sWeatherVibeCore.PercentToRaw(dp, entry.state, pct);
 
-        TransitionPlan const plan = PlanTransition(ts, dp, state, raw, entry.state, pct, toRaw);
+        TransitionPlan const plan = PlanTransition(profile, state, raw, entry.state, toRaw, true);
         uint32 const hold = CalcHoldMs(profile, entry.state, plan.durationMs);
 
-        int const fromIndex = WeatherVibeCore::StateIndex(state);
+        // Each stretch of the way there counts for the state shown during it.
+        for (uint8 i = 0; i < plan.legCount; ++i)
+        {
+            int const legIndex = WeatherVibeCore::StateIndex(plan.legs[i].state);
+            if (legIndex >= 0)
+                spent[size_t(legIndex)] += plan.legs[i].ms;
+        }
+
         int const toIndex = WeatherVibeCore::StateIndex(entry.state);
-        if (fromIndex >= 0) spent[size_t(fromIndex)] += plan.durationMs * 0.5;
-        if (toIndex >= 0)   spent[size_t(toIndex)] += plan.durationMs * 0.5 + hold;
+        if (toIndex >= 0)
+            spent[size_t(toIndex)] += hold;
 
         consec = (entry.state == state) ? consec + 1 : 1;
         state = entry.state;
-        raw = toRaw;
+        if (!plan.keepGrade)
+            raw = toRaw;
         elapsed += double(plan.durationMs) + double(hold);
     }
 

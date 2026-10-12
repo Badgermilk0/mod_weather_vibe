@@ -1,6 +1,8 @@
 #ifndef MOD_WV_PICK_H
 #define MOD_WV_PICK_H
 
+#include "mod_wv_states.h"
+
 #include "Define.h"
 #include "Weather.h"          // WeatherState enum
 
@@ -31,24 +33,39 @@ namespace WeatherVibe
         float fogBridge = 1.5f;    // WeatherVibe.FogBridge.Boost
     };
 
+    // What the client actually draws for a state, whatever its sound or its name: rain
+    // particles, snow particles, sandstorm particles, or nothing but a sky.
+    enum class Ground : uint8 { SKY, RAIN, SNOW, SAND };
+
+    Ground GroundOf(WeatherState state);
+
+    // Any of the three thunder states is Family::THUNDER.
     Family GetFamily(WeatherState state);
-    // 0 = standalone (Fine, Fog, Thunders), 1 = light, 2 = medium, 3 = heavy.
+    // 0 = standalone (Fine, Fog, thunder), 1 = light, 2 = medium, 3 = heavy.
     uint8  GetTier(WeatherState state);
-    // Two states whose grade means the same thing to the eye, so one can become the other by
-    // simply moving the grade: two strengths of the same rain, snow or sandstorm, or a clear
-    // sky and fog (neither has particles; both are only a matter of how heavy the air looks).
+    // Two states the client draws the same way, so one can become the other by simply moving
+    // the grade: strengths of the same rain, snow or sandstorm, with a thunderstorm counting as
+    // the rain (or snow) it is drawn as; and the states that are only a sky — a clear one, fog,
+    // a dry storm.
     bool   IsContinuousPair(WeatherState a, WeatherState b);
 
-    // A thunderstorm grows out of real rain when the table has some: it then counts as the top
-    // of the rain ladder. A table that uses thunder on its own (volcanic rumble, arcane storms)
-    // keeps it as a standalone state.
-    bool   IsThunderCoupled(WeatherTable const& table);
+    // A thunderstorm grows out of real weather when the table has it: with medium or heavy rain
+    // present, Thunders counts as the top of the rain ladder, and ThunderSnow likewise over
+    // medium or heavy snow. Otherwise thunder stands alone, as calm weather that may follow
+    // anything light (a cloudburst, or a dry storm that never had a ladder).
+    struct ThunderCoupling
+    {
+        bool rain = false;
+        bool snow = false;
+    };
+
+    ThunderCoupling GetThunderCoupling(WeatherTable const& table);
 
     // Whether `candidate` can follow `current` without skipping a step.
     //   strict: calm and light weather (Fine, Fog, lone thunder, any light tier) mix freely;
     //           medium and heavy are reached and left one tier at a time, in both directions.
-    //   legacy: only escalation is stepped; Fine, Fog and Thunders are always reachable.
-    bool   IsNaturalTransition(WeatherState current, WeatherState candidate, bool thunderCoupled, bool strict);
+    //   legacy: only escalation is stepped; Fine, Fog and thunder are always reachable.
+    bool   IsNaturalTransition(WeatherState current, WeatherState candidate, ThunderCoupling coupling, bool strict);
 
     // Fog as the bridge between a clear sky and light precipitation, in either direction.
     bool   IsFogBridge(WeatherState current, WeatherState candidate);
