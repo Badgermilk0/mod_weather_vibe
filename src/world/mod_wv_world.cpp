@@ -140,8 +140,11 @@ void WeatherVibeWorld::LoadConfig(ConfigView const& cfg)
     if (thunderMax < thunderMin) std::swap(thunderMin, thunderMax);
     _thunderMinMs = thunderMin * 1000;
     _thunderMaxMs = thunderMax * 1000;
-    _thunderNear = readSounds("WeatherVibe.Thunder.Sounds.Near", "4936, 13021");
-    _thunderFar = readSounds("WeatherVibe.Thunder.Sounds.Far", "9843, 10007");
+    _thunderNear = readSounds("WeatherVibe.Thunder.Sounds.Near", "8439, 13006, 30");
+    _thunderFar = readSounds("WeatherVibe.Thunder.Sounds.Far", "4936");
+    _rumbleSound = cfg.UInt("WeatherVibe.Thunder.Rumble.Sound", 4994);
+    _rumbleMs = std::clamp(cfg.UInt("WeatherVibe.Thunder.Rumble.Seconds", 58), 10u, 600u) * 1000;
+    _rumbleNeighbors = cfg.Bool("WeatherVibe.Thunder.Rumble.Neighbors", true);
 
     // ── Lightning strikes ──
     _lightningEnabled = cfg.Bool("WeatherVibe.Lightning.Enable", false);
@@ -194,16 +197,24 @@ void WeatherVibeWorld::Thunder(Profile const& profile, float intensity)
 
     // A profile's own sounds if it has them (Netherstorm crackles); otherwise loud entries are
     // likelier the harder the storm, which reads as the storm being closer.
-    std::vector<uint32> const* pool = &profile.thunderSounds;
-    if (pool->empty())
+    auto pick = [](std::vector<uint32> const& pool) { return pool.empty() ? 0u : pool[urand(0, uint32(pool.size()) - 1)]; };
+
+    uint32 soundId = 0;
+    uint32 muffledId = 0;   // what a listener under a roof hears instead
+    if (!profile.thunderSounds.empty())
+        soundId = muffledId = pick(profile.thunderSounds);
+    else
     {
         bool const overhead = roll_chance_f(25.0f + 60.0f * std::clamp(intensity, 0.0f, 1.0f));
-        pool = overhead ? &_thunderNear : &_thunderFar;
+        std::vector<uint32> const* pool = overhead ? &_thunderNear : &_thunderFar;
         if (pool->empty())
             pool = overhead ? &_thunderFar : &_thunderNear;
-    }
+        soundId = pick(*pool);
 
-    uint32 const soundId = pool->empty() ? 0 : (*pool)[urand(0, uint32(pool->size()) - 1)];
+        // A 2D clap ignores walls, so indoors it is always a far one: a storm heard through
+        // the roof, not one breaking over the bar.
+        muffledId = overhead && !_thunderFar.empty() ? pick(_thunderFar) : soundId;
+    }
 
     struct Strike { uint32 mapId; float x; float y; };
     std::vector<Strike> strikes;
@@ -224,8 +235,32 @@ void WeatherVibeWorld::Thunder(Profile const& profile, float intensity)
                 }
             }
 
-            if (soundId)
-                player->PlayDirectSound(soundId, player);
+            if (uint32 const id = player->IsOutdoors() ? soundId : muffledId)
+                player->PlayDirectSound(id, player);
+        });
+}
+
+void WeatherVibeWorld::Rumble(Profile const& profile)
+{
+    if (!IsRumbleEnabled())
+        return;
+
+    uint64 const now = uint64(GameTime::GetGameTimeMS().count());
+
+    // Forget players whose last rumble ran out long ago (logged off, or out of every storm).
+    for (auto it = _lastRumble.begin(); it != _lastRumble.end();)
+        it = now - it->second > 4ull * _rumbleMs ? _lastRumble.erase(it) : std::next(it);
+
+    // A one-shot cannot be stopped, so it is never restarted early: the next one only begins
+    // when this one has about run out, and the last one dies away after the storm has gone.
+    sWeatherVibeEngine.ForEachListener(profile, [&](Player* player)
+        {
+            auto [it, fresh] = _lastRumble.try_emplace(player->GetGUID(), now);
+            if (!fresh && now - it->second < _rumbleMs)
+                return;
+
+            it->second = now;
+            player->PlayDirectSound(_rumbleSound, player);
         });
 }
 

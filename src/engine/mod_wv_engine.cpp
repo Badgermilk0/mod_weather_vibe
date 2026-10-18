@@ -34,6 +34,9 @@ namespace
     // How often every client's last packet is checked against what it should be showing.
     constexpr uint32 RECONCILE_MS = 20000;
 
+    // How often a profile looks for a storm in earshot; the rumble itself runs much longer.
+    constexpr uint32 RUMBLE_CHECK_MS = 5000;
+
     // How long the client itself takes to get from one grade to another.
     uint32 ClientFadeMs(float from, float to)
     {
@@ -987,6 +990,19 @@ void WeatherVibeEngine::UpdateProfile(Profile& profile, uint32 diff)
     else
         live.thunderTimerMs = 0;
 
+    // Under the claps, the long low rumble: a storm here, one on its way, or one next door.
+    if (sWeatherVibeWorld.IsRumbleEnabled())
+    {
+        if (live.rumbleTimerMs > diff)
+            live.rumbleTimerMs -= diff;
+        else
+        {
+            live.rumbleTimerMs = RUMBLE_CHECK_MS;
+            if (StormInEarshot(profile))
+                sWeatherVibeWorld.Rumble(profile);
+        }
+    }
+
     if (live.forced && live.forcedTimed)
     {
         if (live.forcedMs <= diff)
@@ -1151,6 +1167,24 @@ void WeatherVibeEngine::OnAreaChange(Player* player, uint32 oldArea, uint32 newA
 
     if (Resolve(zoneId, oldArea) != Resolve(zoneId, newArea))
         SendCurrentTo(player, zoneId, newArea);
+}
+
+bool WeatherVibeEngine::StormInEarshot(Profile const& profile) const
+{
+    auto storm = [](LiveState const& live)
+        {
+            return live.started && (WeatherVibeCore::IsThunder(live.state) || WeatherVibeCore::IsThunder(live.targetState));
+        };
+
+    if (storm(profile.live))
+        return true;
+
+    if (sWeatherVibeWorld.RumbleFromNeighbors())
+        for (uint16 index : profile.neighbors)
+            if (storm(_profiles[index].live))
+                return true;
+
+    return false;
 }
 
 void WeatherVibeEngine::ForEachListener(Profile const& profile, std::function<void(Player*)> const& visit) const

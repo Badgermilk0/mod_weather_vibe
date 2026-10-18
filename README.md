@@ -33,8 +33,10 @@ reworked here. Demos of the original: <https://youtu.be/GRyTk5umEno>, <https://y
 - **One step at a time.** From a calm sky weather starts light; medium follows light, heavy
   follows medium, and it eases off the same way. A thunderstorm grows out of real rain.
 - **Real thunderstorms.** The game client has none: what the core calls "Thunders" is rain with
-  the Dark Portal's hum. Here a storm is a downpour, a blizzard or a dark dry sky, whichever
-  suits the zone, with real thunderclaps played by the server. Optionally, lightning bolts.
+  its thunder bed in place of the rain sound. Here a storm is a downpour, a blizzard or a dark
+  dry sky, whichever suits the zone, with real thunderclaps played by the server over the rain,
+  and the client's own distant rumble under them - heard from the next zone before a storm
+  arrives. Optionally, lightning bolts.
 - **Weights mean what they say.** A state with 10% of a table's weight is in the sky about 10%
   of the time, including the heavy tiers that stepping would otherwise starve.
 - **Time of day.** Mist at dawn and after dark, thunder in the afternoon and evening.
@@ -181,6 +183,7 @@ it. Ids are checked at startup, and anything unknown is reported in the server l
 | `WeatherVibe.Thunder.Enable` | 1 | Thunderclaps during storms |
 | `WeatherVibe.Thunder.IntervalSeconds.Min` / `.Max` | 12 / 70 | Gap between claps; nearer the minimum as the storm builds |
 | `WeatherVibe.Thunder.Sounds.Near` / `.Far` | see file | Loud and quiet clap sounds; loud ones are likelier in a hard storm |
+| `WeatherVibe.Thunder.Rumble.Sound` / `.Seconds` / `.Neighbors` | 4994 / 58 / 1 | The long distant-thunder bed under a storm, how often it restarts, and whether a storm next door is heard |
 | `WeatherVibe.Lightning.Enable` | 0 | Lightning bolts landing near players during storms |
 | `WeatherVibe.Lightning.*` | see file | Which object, how often, how far away, how long it stays |
 

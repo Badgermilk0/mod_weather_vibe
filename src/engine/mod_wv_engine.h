@@ -89,6 +89,7 @@ namespace WeatherVibe
 
         uint32 resyncTimerMs = 0;     // next re-announce to hook listeners
         uint32 thunderTimerMs = 0;    // next clap while a storm is up; 0 = none scheduled
+        uint32 rumbleTimerMs = 0;     // next look for a storm in earshot (here, coming, next door)
         bool   dirty = false;         // changed since the last broadcast pass
     };
 
@@ -177,6 +178,8 @@ private:
     void WarmStart(WeatherVibe::Profile& profile);
 
     void UpdateProfile(WeatherVibe::Profile& profile, uint32 diff);
+    // A storm on screen or on its way here, or (Thunder.Rumble.Neighbors) in a neighbouring profile.
+    bool StormInEarshot(WeatherVibe::Profile const& profile) const;
     void AdvanceTransition(WeatherVibe::Profile& profile, uint32 diff);
     void PickNext(WeatherVibe::Profile& profile);
     // mayStay: a pick of the profile's own may decide nothing needs to change on screen (a

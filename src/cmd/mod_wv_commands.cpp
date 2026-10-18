@@ -401,7 +401,7 @@ public:
         Reply(handler, Acore::StringFormat("showing client weather {} at grade {:.2f} ({:.0f}% of full density), to you only. "
             "It stays until .wvibe audition off.", weatherId, grade, Density(grade) * 100.0f));
         handler->SendSysMessage("  the id picks the sound; the grade what falls (nothing at or below 0.25) and how dark the sky is (full from 0.25)");
-        handler->SendSysMessage("  extra looks: 104 ash mist | 103 ember dust | 90 dark rain | 100 red rain | 86 rain + Dark Portal hum");
+        handler->SendSysMessage("  extra looks: 104 ash mist | 103 ember dust | 90 dark rain | 100 red rain | 86 rain with the thunder bed for its sound");
         return true;
     }
 

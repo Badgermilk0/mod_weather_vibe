@@ -61,9 +61,16 @@ public:
     bool   IsThunderEnabled() const { return _thunderEnabled; }
     // Time to the next clap; shorter as the storm (0..1) builds.
     uint32 NextThunderDelayMs(float intensity) const;
-    // One clap, the same for everyone standing in the profile. With lightning switched on, a
-    // listener may get a bolt nearby instead, which brings its own thunder.
+    // One clap, the same for everyone standing in the profile outdoors; under a roof a near
+    // clap is heard as a far one. With lightning switched on, a listener may get a bolt
+    // nearby instead, which brings its own thunder.
     void   Thunder(WeatherVibe::Profile const& profile, float intensity);
+    // The rumble: the client's own long storm bed (Thunder.Rumble.Sound) under the claps and the
+    // rain, played to each listener once per Rumble.Seconds. Tracked per player, so walking
+    // from one stormy profile into another never stacks two of them.
+    bool   IsRumbleEnabled() const { return _thunderEnabled && _rumbleSound; }
+    bool   RumbleFromNeighbors() const { return _rumbleNeighbors; }
+    void   Rumble(WeatherVibe::Profile const& profile);
     // Drops a lightning bolt on open ground between minDist and maxDist yards from the player.
     // Works whether or not strikes are switched on, so `.wvibe lightning` can show one.
     bool   StrikeLightningNear(Player* player, float minDist, float maxDist);
@@ -83,6 +90,11 @@ private:
     uint32 _thunderMaxMs = 70 * 1000;
     std::vector<uint32> _thunderNear;    // loud sound entries: a storm overhead
     std::vector<uint32> _thunderFar;     // quiet ones: a storm some way off
+
+    uint32 _rumbleSound = 4994;          // "DarkPortal": the 59 s bed the client pairs with weather 86
+    uint32 _rumbleMs = 58 * 1000;
+    bool   _rumbleNeighbors = true;
+    std::unordered_map<ObjectGuid, uint64> _lastRumble;   // game-time ms of each player's last one
 
     bool   _lightningEnabled = false;
     bool   _lightningBroken = false;     // the game object is missing from the world DB

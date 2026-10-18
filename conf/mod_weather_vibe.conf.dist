@@ -141,7 +141,7 @@ WeatherVibe.Front.Strength = 1.5
 #######################################################################################################
 
 # Thunder. The game client has no thunderstorm of its own: the weather the core
-# calls "Thunders" (86) is rain with the Dark Portal's ambience loop. So a
+# calls "Thunders" (86) is rain with a thunder bed instead of the rain loop. So a
 # storm here is drawn as rain, snow or the darkest sky - whichever suits the
 # profile, as hard as its grade says - and the server plays the thunderclaps. Everyone in the
 # same weather hears the same clap. The gap between claps is random between
@@ -153,15 +153,36 @@ WeatherVibe.Thunder.IntervalSeconds.Max = 70
 
 # The claps: sound ids (SoundEntries.dbc) whose files ship with every 3.3.5a
 # client. "Near" are loud and are picked more often the harder the storm;
-# "Far" are quiet. A sound entry with several files plays a random one.
-#   4936   Blasted Lands lightning bolt   (3 variants, loudest)
-#   13021  Storm Peaks lightning          (3 variants)
-#   9843   Netherstorm lightning crack    (7 variants, quieter)
-#   10007  the same cracks, quieter still
+# "Far" are quiet rumbles. A sound entry with several files plays a random one.
+# A player indoors always hears a "Far" one (the clap is 2D and ignores walls).
+# Measured from the files (length heard, share of sound below 120 Hz):
+#   8439   Blasted Lands bolt, 4 variants      2.3-4.5 s, 26-32% bass  crack + roll
+#   4936   the same, 3 of those 4 variants
+#   13006  Thunderstorm (shaman spell)         2.9 s, 31% bass  one big boom
+#   30     Call Lightning impact               2.5 s, 25% bass
+#   9947   earthquake rumble, volume 0.2       3.5 s, 66% bass  - heard as falling stone
+#   1485   the same rumble, volume 0.4
+#   13021  Storm Peaks bolt                    1.3 s, 5-24% bass  thin crack
+#   9843   Netherstorm crack                   1.5 s, 0% bass  electric "bzzt"
+#   10007  the same cracks, quieter
+# 9843 / 10007 suit an arcane storm (Netherstorm below), not a rainstorm.
 # Audition any of them in game with  .debug play sound <id>
 # ----------------------------------------------------------------------
-WeatherVibe.Thunder.Sounds.Near = 4936, 13021
-WeatherVibe.Thunder.Sounds.Far  = 9843, 10007
+WeatherVibe.Thunder.Sounds.Near = 8439, 13006, 30
+WeatherVibe.Thunder.Sounds.Far  = 4936
+
+# The rumble: a long, low roll of distant thunder under the rain and the claps.
+# Sound 4994 ("DarkPortal") is the 59 s bed the client itself pairs with its
+# weather 86 - the thunderstorm sound of the unmodded game. Each player hears
+# it once per Seconds (a little under its length, so it runs on without a
+# gap) while a storm is on screen, while one is building up here, and - with
+# Neighbors = 1 - while a neighbouring profile has one, so a storm next door is
+# heard before it arrives. A started rumble cannot be stopped: it dies away up
+# to a minute after the storm has passed.  Sound = 0 turns the rumble off.
+# ----------------------------------------------------------------------
+WeatherVibe.Thunder.Rumble.Sound = 4994
+WeatherVibe.Thunder.Rumble.Seconds = 58
+WeatherVibe.Thunder.Rumble.Neighbors = 1
 
 # Lightning strikes. With a clap, a bolt may land near a player: a short-lived
 # native game object (no SQL needed) with its own thunder that fades with

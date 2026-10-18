@@ -175,7 +175,9 @@ def main():
                       'WeatherVibe.Remarks.CooldownMinutes', 'WeatherVibe.Remarks.Range',
                       'WeatherVibe.Thunder.Enable', 'WeatherVibe.Thunder.IntervalSeconds.Min',
                       'WeatherVibe.Thunder.IntervalSeconds.Max', 'WeatherVibe.Thunder.Sounds.Near',
-                      'WeatherVibe.Thunder.Sounds.Far', 'WeatherVibe.Lightning.Enable',
+                      'WeatherVibe.Thunder.Sounds.Far', 'WeatherVibe.Thunder.Rumble.Sound',
+                      'WeatherVibe.Thunder.Rumble.Seconds', 'WeatherVibe.Thunder.Rumble.Neighbors',
+                      'WeatherVibe.Lightning.Enable',
                       'WeatherVibe.Lightning.GameObject', 'WeatherVibe.Lightning.Chance',
                       'WeatherVibe.Lightning.DespawnSeconds', 'WeatherVibe.Lightning.Distance.Min',
                       'WeatherVibe.Lightning.Distance.Max')

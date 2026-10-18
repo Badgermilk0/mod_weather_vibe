@@ -64,14 +64,23 @@ Read from the stock tables; these facts shape several decisions below.
 - **The sandstorm loops are crossed** against the core's names: id 22 ("light") carries
   `SandStormHeavy.wav`, 41 carries the light loop, 42 the medium one.
 - **There is no thunderstorm.** Id 86, `WEATHER_STATE_THUNDERS` in the core, is rain particles
-  with the ambience `DarkPortal` (`Sound\Ambience\ZoneAmbience\DarkPortal.wav`).
+  with the ambience `DarkPortal` (sound 4994, `Sound\Ambience\ZoneAmbience\DarkPortal.wav`)
+  in place of the rain loop. That file is no hum: 59 s of stereo low rumble with rolls swelling
+  out of it (at about 2, 7, 24 and 39 s) - distant thunder, the unmodded game's storm sound.
 - **Extra rows nothing here used:** 104 (sandstorm motion, black, `SNOWMIST01` texture, silent),
   103 (sandstorm, orange), 90 (rain motion, `LeafBrown` texture, silent — the core's "black
   rain"), 100 and 108 (rain, `RainDropRed01`). 103 and 105–107 have that last number at 0.
 - **378 of 715 lights have a separate storm parameter set.** Only there can the grade darken
   the sky; elsewhere Fine and Fog at any grade look the same.
-- **Thunder exists as doodad sounds**: 4936 and 8439 (Blasted Lands bolt), 13021 (Storm Peaks
-  lightning), 9843 and 10007 (Netherstorm crack). All files are in stock `common.mpq`.
+- **Thunder exists as doodad and spell sounds**, all in stock `common.mpq`. Measured from the
+  files (time heard above -30 dB of peak; share of energy below 120 Hz): 8439 / 4936 (Blasted
+  Lands bolt, 2.3-4.5 s, 26-32%: a crack and a roll), 13006 (`Shaman_Thunder.wav`, 2.9 s, 31%:
+  one boom), 30 (`CallLightning.wav`, 2.5 s, 25%), 9947 / 1485 (`EarthquakeCameraShake.wav` at
+  volume 0.2 / 0.4, 3.5 s of flat 66% rumble: the distant roll). 13021 (Storm Peaks, 1.3 s,
+  5-24%) is a thin crack, and 9843 / 10007 (Netherstorm crack, 1.5 s, 0%) have no bass at all:
+  an electric "bzzt", right for an arcane storm and wrong for a rainstorm. There is no thunder
+  roll as such in the data. The played client's `patch-s` SoundEntries leaves all of these as
+  stock.
 - **Lightning exists as a game object model**: display 6352 (`ZulGurubLightningMadness.mdx`)
   with sound 8439 attached, used by stock objects 190569, 183356 and 180252.
 
@@ -204,7 +213,8 @@ but the choice of sound (rule 1), it is picked for the sound, by how much is fal
 | any sandstorm, `Sandstorm.Skin = ash` or `ember` | from `Sound.From.Light` | 104 or 103 |
 
 A state's name does not choose the loop: `HeavyRain` at 5% of its band is sent as 4, and
-`Thunders` (the client's own 86 is rain with the Dark Portal's hum, so it is never sent) and
+`Thunders` (the client's own 86 swaps the rain loop for its thunder bed, so it is never sent;
+the server plays that bed itself, see the rumble below) and
 `ThunderSnow` climb the same ladder as the rain and snow they are drawn as. The sandstorm ids
 are in that order because the client's table has its loops crossed. The first row of
 precipitation is what stops sound without particles: at 0.29 about 5% of full density is
@@ -229,7 +239,20 @@ While a thunder state is on screen, `UpdateProfile()` runs a timer and
 `WeatherVibeWorld::Thunder()` plays a clap: one sound id for the whole profile, sent to each
 listener with `PlayDirectSound(id, player)`. The gap runs from `IntervalSeconds.Max` down to
 `.Min` as intensity rises. Loud entries (`Sounds.Near`) are favoured in a hard storm and quiet
-ones (`Sounds.Far`) in a light one, which is the only "distance" a 2D sound can have.
+ones (`Sounds.Far`) in a light one, which is the only "distance" a 2D sound can have. A
+listener indoors (`!IsOutdoors()`) gets a `Sounds.Far` clap in place of a near one, since a
+2D sound ignores walls; a profile with its own `Thunder.Sounds` plays them everywhere.
+
+**The rumble** (`Thunder.Rumble.*`): under the claps, sound 4994 - the bed the client pairs
+with its weather 86 - so the rain loop and the thunder bed play together, which sending 86
+could never do. Every 5 s (`RUMBLE_CHECK_MS`) a profile asks `StormInEarshot()`: is its state
+or its target a thunder state (a storm on screen, or one building up here), or, with
+`Rumble.Neighbors`, is a neighbouring profile's? If so `WeatherVibeWorld::Rumble()` plays the
+bed to each listener whose last one began `Rumble.Seconds` (58, the file is 59.4) or more ago.
+The time is kept per player (`_lastRumble`), not per profile, so a player walking from one
+stormy profile into another, or into the one next door, never hears two at once. A 2D
+one-shot cannot be stopped from the server, so the last one runs out on its own, up to a
+minute after the storm has gone - heard as the storm moving off. It plays indoors too.
 
 **Lightning** (`Lightning.Enable`, off by default): per listener per clap, a chance to spawn a
 stock lightning object with `Map::SummonGameObject` — unowned, removed after
@@ -474,7 +497,9 @@ thread.
 - The season table is northern-hemisphere and the same for every zone.
 - Client ids 90, 100, 103 and 104 are reachable only as skins. 106 ("black snow", the Lich
   King's) and the rest of `Weather.dbc` are not driven at all; `.wvibe audition` shows them.
-- A 2D clap has no direction or distance and ignores walls: thunder sounds the same in an inn.
+- A 2D clap has no direction or distance and ignores walls. Indoors the far clap stands in
+  for a near clap, but it is not muffled: the client's occlusion low-pass only acts on 3D
+  sounds (the lightning object's thunder is one).
 - The lightning object's look is unverified, and its thunder is whatever sound the model
   carries (8439), not the profile's `Thunder.Sounds`.
 - `tools/area_ids.tsv` is the stock table. A server whose DBC files were edited may differ;
