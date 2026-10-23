@@ -49,15 +49,21 @@ static char const* Name(WeatherState s)
     case WEATHER_STATE_THUNDERS:         return "Thunders";
     case WV_STATE_THUNDER_SNOW:          return "ThunderSnow";
     case WV_STATE_DRY_THUNDERS:          return "DryThunders";
+    case WV_STATE_CLEAR:                 return "Clear";
+    case WV_STATE_TEMPEST:               return "Tempest";
+    case WV_STATE_BLIZZARD:              return "Blizzard";
     default:                             return "?";
     }
 }
 
-// A row's state: a number, or one of the two names that have no number worth remembering.
+// A row's state: a number, or one of the names that have no number worth remembering.
 static WeatherState ParseState(std::string const& token)
 {
     if (token == "ThunderSnow") return WV_STATE_THUNDER_SNOW;
     if (token == "DryThunders") return WV_STATE_DRY_THUNDERS;
+    if (token == "Clear")       return WV_STATE_CLEAR;
+    if (token == "Tempest")     return WV_STATE_TEMPEST;
+    if (token == "Blizzard")    return WV_STATE_BLIZZARD;
     return WeatherState(std::stoul(token));
 }
 
@@ -76,7 +82,7 @@ int main(int argc, char** argv)
     std::map<std::string, uint32> maxConsec;      // profile -> Max.Consecutive.Same
 
     std::ifstream in(argv[1]);
-    std::regex row(R"(^WeatherVibe\.Profile\.(\w+)\.(Spring|Summer|Autumn|Winter)\.\d+\s*=\s*([\d.]+)\s*,\s*(\d+|ThunderSnow|DryThunders)\s*,\s*([\d.]+)\s*,\s*([\d.]+))");
+    std::regex row(R"(^WeatherVibe\.Profile\.(\w+)\.(Spring|Summer|Autumn|Winter)\.\d+\s*=\s*([\d.]+)\s*,\s*(\d+|ThunderSnow|DryThunders|Clear|Tempest|Blizzard)\s*,\s*([\d.]+)\s*,\s*([\d.]+))");
     std::regex consec(R"(^WeatherVibe\.Profile\.(\w+)\.Transition\.Max\.Consecutive\.Same\s*=\s*(\d+))");
     std::string line;
     std::smatch m;
@@ -96,15 +102,16 @@ int main(int argc, char** argv)
             maxConsec[m[1].str()] = uint32(std::stoul(m[2]));
     }
 
-    // "Thunders" (86) means the storm that suits the profile, decided from all its tables —
-    // the same rule as WeatherVibeEngine::LoadProfile. (Thunder.Style overrides are not read here.)
+    // "Thunders" (86) means the storm that suits the profile, decided from all its tables, and
+    // "Tempest" the worst of it — the same rule as WeatherVibeEngine::LoadProfile and
+    // ResolveThunder. (Thunder.Style overrides are not read here.)
     std::map<std::string, std::pair<bool, bool>> weatherOf;   // profile -> (has rain, has snow)
     for (auto const& [name, table] : tables)
     {
         auto& [hasRain, hasSnow] = weatherOf[name.substr(0, name.find('.'))];
         for (WeatherEntry const& entry : table)
         {
-            if (GetTier(entry.state) == 0)
+            if (GetTier(entry.state) == 0 || entry.state == WV_STATE_TEMPEST)
                 continue;
             hasRain = hasRain || GetFamily(entry.state) == Family::RAIN;
             hasSnow = hasSnow || GetFamily(entry.state) == Family::SNOW;
@@ -115,9 +122,14 @@ int main(int argc, char** argv)
     {
         auto const& [hasRain, hasSnow] = weatherOf[name.substr(0, name.find('.'))];
         WeatherState const thunderAs = hasRain ? WEATHER_STATE_THUNDERS : hasSnow ? WV_STATE_THUNDER_SNOW : WV_STATE_DRY_THUNDERS;
+        WeatherState const tempestAs = hasRain ? WV_STATE_TEMPEST : hasSnow ? WV_STATE_BLIZZARD : WV_STATE_DRY_THUNDERS;
         for (WeatherEntry& entry : table)
+        {
             if (entry.state == WEATHER_STATE_THUNDERS)
                 entry.state = thunderAs;
+            else if (entry.state == WV_STATE_TEMPEST)
+                entry.state = tempestAs;
+        }
     }
 
     struct Skew { double ratio; std::string what; double expected, got; };

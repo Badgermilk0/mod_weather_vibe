@@ -58,11 +58,12 @@ public:
     }
 
     // A loading screen: the client starts its weather over, so the zone hook that follows
-    // must send whatever is up, even if it is what this client was last told.
+    // must send whatever is up, even if it is what this client was last told - and abruptly,
+    // so the weather is already there when the screen lifts.
     void OnPlayerMapChanged(Player* player) override
     {
         if (WeatherVibeCore::HasClient(player))
-            WeatherVibeCore::Forget(player);
+            WeatherVibeCore::Forget(player, true);
     }
 
     void OnPlayerUpdateZone(Player* player, uint32 newZone, uint32 newArea) override

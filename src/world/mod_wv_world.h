@@ -56,9 +56,16 @@ public:
     static WeatherTurn  ClassifyTurn(WeatherState previous, WeatherState now);
     static char const*  TurnName(WeatherTurn turn);
 
-    // --- Thunder. The client has no thunderstorm (see mod_wv_states.h): it draws the rain,
-    //     snow or dark sky, and the claps come from here. ---
-    bool   IsThunderEnabled() const { return _thunderEnabled; }
+    // --- Thunder. The stock client has no thunderstorm (see mod_wv_states.h): it draws the
+    //     rain, snow or dark sky. A Waystone client is asked for its own lightning instead
+    //     (WeatherVibeEngine::WireOf); WeatherVibe.Client.Thunder says which is used. ---
+    // Thunder at all (WeatherVibe.Thunder.Enable).
+    bool   IsThunderOn() const { return _thunderEnabled; }
+    // The server's own claps and rumble: unless every listener is left to the client.
+    bool   IsThunderEnabled() const
+    {
+        return _thunderEnabled && sWeatherVibeCore.GetThunderSource() != ThunderSource::CLIENT;
+    }
     // Time to the next clap; shorter as the storm (0..1) builds.
     uint32 NextThunderDelayMs(float intensity) const;
     // One clap, the same for everyone standing in the profile outdoors; under a roof a near
@@ -68,7 +75,7 @@ public:
     // The rumble: the client's own long storm bed (Thunder.Rumble.Sound) under the claps and the
     // rain, played to each listener once per Rumble.Seconds. Tracked per player, so walking
     // from one stormy profile into another never stacks two of them.
-    bool   IsRumbleEnabled() const { return _thunderEnabled && _rumbleSound; }
+    bool   IsRumbleEnabled() const { return IsThunderEnabled() && _rumbleSound; }
     bool   RumbleFromNeighbors() const { return _rumbleNeighbors; }
     void   Rumble(WeatherVibe::Profile const& profile);
     // Drops a lightning bolt on open ground between minDist and maxDist yards from the player.

@@ -39,10 +39,14 @@ namespace WeatherVibe
 
     Ground GroundOf(WeatherState state);
 
-    // Any of the three thunder states is Family::THUNDER.
+    // Any of the three thunder states is Family::THUNDER. Clear is FINE; Tempest is the top of
+    // the rain, Blizzard the top of the snow.
     Family GetFamily(WeatherState state);
-    // 0 = standalone (Fine, Fog, thunder), 1 = light, 2 = medium, 3 = heavy.
+    // 0 = standalone (Clear, Fine, Fog, thunder), 1 = light, 2 = medium, 3 = heavy,
+    // 4 = Tempest and Blizzard, which are only ever reached from heavy weather of their own kind.
     uint8  GetTier(WeatherState state);
+    // Fine or Clear: a sky whose percentage reads as how clear it is.
+    bool   IsClearSky(WeatherState state);
     // Two states the client draws the same way, so one can become the other by simply moving
     // the grade: strengths of the same rain, snow or sandstorm, with a thunderstorm counting as
     // the rain (or snow) it is drawn as; and the states that are only a sky — a clear one, fog,
@@ -63,7 +67,8 @@ namespace WeatherVibe
 
     // Whether `candidate` can follow `current` without skipping a step.
     //   strict: calm and light weather (Fine, Fog, lone thunder, any light tier) mix freely;
-    //           medium and heavy are reached and left one tier at a time, in both directions.
+    //           medium, heavy and the tempest above it are reached and left one tier at a time,
+    //           in both directions. Clear only borders Fine and Fog.
     //   legacy: only escalation is stepped; Fine, Fog and thunder are always reachable.
     bool   IsNaturalTransition(WeatherState current, WeatherState candidate, ThunderCoupling coupling, bool strict);
 

@@ -23,22 +23,28 @@ import os
 import re
 import sys
 
-# 186 and 286 are the module's own thunder states; they have no client id (see mod_wv_states.h).
+# 186, 286, 300, 308 and 386 are the module's own states; they have no client id (see mod_wv_states.h).
 STATES = {
     0: 'Fine', 1: 'Fog',
     3: 'LightRain', 4: 'MediumRain', 5: 'HeavyRain',
     6: 'LightSnow', 7: 'MediumSnow', 8: 'HeavySnow',
     22: 'LightSandstorm', 41: 'MediumSandstorm', 42: 'HeavySandstorm',
     86: 'Thunders', 186: 'ThunderSnow', 286: 'DryThunders',
+    300: 'Clear', 386: 'Tempest', 308: 'Blizzard',
 }
 STATE_BY_NAME = {name.lower(): sid for sid, name in STATES.items()}
 FAMILY = {0: 'fine', 1: 'fog', 3: 'rain', 4: 'rain', 5: 'rain', 6: 'snow', 7: 'snow', 8: 'snow',
-          22: 'sand', 41: 'sand', 42: 'sand', 86: 'thunder', 186: 'thunder', 286: 'thunder'}
+          22: 'sand', 41: 'sand', 42: 'sand', 86: 'thunder', 186: 'thunder', 286: 'thunder',
+          300: 'fine', 386: 'thunder', 308: 'snow'}
 PROFILE_CHOICES = {
     'Thunder.Style': ('auto', 'rain', 'snow', 'dry'),
     'Rain.Skin': ('rain', 'dark', 'red'),
     'Sandstorm.Skin': ('sand', 'ash', 'ember'),
 }
+CLIENT_CHOICES = {'WeatherVibe.Client.Thunder': ('client', 'server', 'both')}
+# The tops of the scale and what each needs below it; Clear and what it may follow.
+TOPS = ((386, (5, 86), 'HeavyRain or Thunders'), (308, (8,), 'HeavySnow'))
+CLEAR_NEIGHBOURS = (0, 1)
 
 
 def load_areas():
@@ -54,7 +60,7 @@ def load_areas():
             ident, parent, map_id, map_type, map_name, name = line.rstrip('\n').split('\t')
             areas[int(ident)] = (int(parent), int(map_id), map_type, map_name, name)
     return areas
-TIER = {3: 1, 4: 2, 5: 3, 6: 1, 7: 2, 8: 3, 22: 1, 41: 2, 42: 3}
+TIER = {3: 1, 4: 2, 5: 3, 6: 1, 7: 2, 8: 3, 22: 1, 41: 2, 42: 3, 386: 4, 308: 4}
 LADDERS = ((3, 4, 5), (6, 7, 8), (22, 41, 42))
 SEASONS = ('Spring', 'Summer', 'Autumn', 'Winter')
 DAYPARTS = ('MORNING', 'AFTERNOON', 'EVENING', 'NIGHT')
@@ -66,9 +72,13 @@ RETIRED_TRANSITION_KEYS = ('SeasonBlendMinutes',)
 # The 3.3.5a client's own rules (DESIGN.md, "What the client does with a weather packet"):
 # nothing falls at or below this grade, and the sky is fully stormy from it up.
 CLIENT_PARTICLE_FLOOR = 0.25
-SKY_STATES = ('fine', 'fog', 'drythunders')       # states that are a sky and nothing else
+SKY_STATES = ('clear', 'fine', 'fog', 'drythunders')   # states that are a sky and nothing else
+SAND_STATES = ('lightsandstorm', 'mediumsandstorm', 'heavysandstorm')   # no silent row to draw thin sand with
 SOUND_KEYS = {'WeatherVibe.Sound.From.Light': 0.29, 'WeatherVibe.Sound.From.Medium': 0.50,
               'WeatherVibe.Sound.From.Heavy': 0.68}
+LOOK_PAIR = re.compile(r'^WeatherVibe\.Look\.(\w+)\.(Density|Storm|Lightning)$')
+LOOK_SKY = re.compile(r'^WeatherVibe\.Look\.Sky\.(Rain|Snow|Sandstorm)$')
+LOOK_RANGES = {'Density': (0, 2), 'Storm': (0, 1), 'Lightning': (0, 60)}
 
 # What a profile's header comment may promise, and the family that would break the promise.
 # "almost no rain" and the like are not promises.
@@ -180,7 +190,10 @@ def main():
                       'WeatherVibe.Lightning.Enable',
                       'WeatherVibe.Lightning.GameObject', 'WeatherVibe.Lightning.Chance',
                       'WeatherVibe.Lightning.DespawnSeconds', 'WeatherVibe.Lightning.Distance.Min',
-                      'WeatherVibe.Lightning.Distance.Max')
+                      'WeatherVibe.Lightning.Distance.Max', 'WeatherVibe.Client.Extension',
+                      'WeatherVibe.Client.Thunder', 'WeatherVibe.Sound.SilentDrizzle',
+                      'WeatherVibe.Look.DistantStorm.Lightning', 'WeatherVibe.Look.DistantStorm.Rumble',
+                      'WeatherVibe.Look.DistantStorm.Neighbors')
     profile_settings = []                         # (profile, setting, line) for keys that need the profile to exist
 
     # The grade from which each sound loop is used. Below the first, precipitation is sent as sky.
@@ -194,6 +207,8 @@ def main():
         else:
             sound_from[key] = number
     light_from, medium_from, heavy_from = (sound_from[key] for key in SOUND_KEYS)
+    # With the silent rows (2 rain, 61 snow), thin rain and snow are drawn from just above the floor.
+    silent_drizzle = values.get('WeatherVibe.Sound.SilentDrizzle', ('1', 0))[0].lower() in ('1', 'true', 'yes', 'on')
     if not light_from <= medium_from <= heavy_from:
         report.add('WARN', values.get('WeatherVibe.Sound.From.Light', ('', 0))[1],
                    'WeatherVibe.Sound.From.Light / Medium / Heavy should rise in that order; the module raises the later ones to fit')
@@ -260,13 +275,16 @@ def main():
                 report.add('ERROR', line, f'{key} = {value}: want a multiplier of 0 or more')
             continue
 
-        match = re.match(r'^WeatherVibe\.Profile\.(\w+)\.(Thunder\.Style|Rain\.Skin|Sandstorm\.Skin|Thunder\.Sounds)$', key)
+        match = re.match(r'^WeatherVibe\.Profile\.(\w+)\.(Thunder\.Style|Rain\.Skin|Sandstorm\.Skin|Thunder\.Sounds|Lightning\.Color)$', key)
         if match:
             name, setting = match.groups()
             profile_settings.append((name, setting, line))
             if setting == 'Thunder.Sounds':
                 if not value or any(not part.strip().isdigit() for part in value.split(',')):
                     report.add('ERROR', line, f'{key} = {value}: want sound ids separated by commas')
+            elif setting == 'Lightning.Color':
+                if not re.match(r'^(0[xX]|#)?[0-9a-fA-F]{1,6}$', value):
+                    report.add('ERROR', line, f'{key} = {value}: want a colour as 0xRRGGBB')
             elif value.lower() not in PROFILE_CHOICES[setting]:
                 report.add('ERROR', line, f'{key} = {value}: want one of {", ".join(PROFILE_CHOICES[setting])}')
             continue
@@ -305,11 +323,41 @@ def main():
                     warned_bands.add(state_name)
                     report.add('WARN', line, f'{key} = {value}: {state_name} is only a sky, and the client\'s sky is fully '
                                f'stormy at grade {CLIENT_PARTICLE_FLOOR}; the part of the band above that changes nothing')
-            elif parts[0] < light_from - 0.001 and state_name not in warned_bands:
-                warned_bands.add(state_name)
-                report.add('WARN', line, f'{key} = {value}: nothing falls at or below grade {CLIENT_PARTICLE_FLOOR} and the module '
-                           f'sends plain sky below {light_from:g} (WeatherVibe.Sound.From.Light), so the low percentages of '
-                           f'{state_name} show no weather')
+            else:
+                drawn_from = CLIENT_PARTICLE_FLOOR + 0.01 if silent_drizzle and state_name.lower() not in SAND_STATES else light_from
+                if parts[0] < drawn_from - 0.001 and state_name not in warned_bands:
+                    warned_bands.add(state_name)
+                    report.add('WARN', line, f'{key} = {value}: nothing is drawn for {state_name} below grade {drawn_from:g} '
+                               f'(nothing falls at or below {CLIENT_PARTICLE_FLOOR}; without a silent row, plain sky is sent below '
+                               f'WeatherVibe.Sound.From.Light), so its low percentages show no weather')
+            continue
+
+        match = None if key in known_keys else (LOOK_PAIR.match(key) or LOOK_SKY.match(key))
+        if match:
+            parts = [to_float(p) for p in value.split(',')]
+            if match.re is LOOK_PAIR and match.group(1).lower() not in STATE_BY_NAME:
+                report.add('ERROR', line, f'{key}: "{match.group(1)}" is not a weather state name')
+            elif len(parts) != 2 or None in parts:
+                report.add('ERROR', line, f'{key} = {value}: want <a>, <b>')
+            elif match.re is LOOK_PAIR:
+                low, high = LOOK_RANGES[match.group(2)]
+                if not all(low <= p <= high for p in parts):
+                    report.add('WARN', line, f'{key} = {value}: values are clamped to {low}..{high}')
+            elif not (0 <= parts[0] <= 1 and 0 < parts[1] <= 1):
+                report.add('WARN', line, f'{key} = {value}: want the sky at the first drop (0..1) and the density at which it is full (0..1)')
+            continue
+
+        match = re.match(r'^WeatherVibe\.Look\.(\w+)\.Duck$', key)
+        if match:
+            if match.group(1).lower() not in STATE_BY_NAME:
+                report.add('ERROR', line, f'{key}: "{match.group(1)}" is not a weather state name')
+            elif to_float(value) is None or float(value) > 1:
+                report.add('ERROR', line, f'{key} = {value}: want 0..1 (or below 0 to leave it to the client)')
+            continue
+
+        if key in CLIENT_CHOICES:
+            if value.lower() not in CLIENT_CHOICES[key]:
+                report.add('ERROR', line, f'{key} = {value}: want one of {", ".join(CLIENT_CHOICES[key])}')
             continue
 
         if re.match(r'^WeatherVibe\.Hold\.(\w+)$', key):
@@ -368,6 +416,13 @@ def main():
                     if ladder[tier] in present and ladder[tier - 1] not in present:
                         report.add('WARN', line, f'{name}.{season}: {STATES[ladder[tier]]} has no {STATES[ladder[tier - 1]]} below it; '
                                                  'weather escalates a tier at a time, so it will rarely be reached')
+
+            for top, below, what in TOPS:
+                if top in present and not any(state in present for state in below):
+                    report.add('WARN', line, f'{name}.{season}: {STATES[top]} has no {what} below it; it is only reached '
+                                             'from the heaviest weather of its kind, so it will rarely be reached')
+            if 300 in present and not any(state in present for state in CLEAR_NEIGHBOURS):
+                report.add('WARN', line, f'{name}.{season}: Clear only follows Fine or Fog, and the table has neither')
 
             # With medium/heavy rain in the table, thunder grows out of that rain; otherwise it stands alone.
             if not any(TIER.get(state, 0) <= 1 for state in present):
