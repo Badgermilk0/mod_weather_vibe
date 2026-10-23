@@ -134,9 +134,14 @@ public:
 
             handler->SendSysMessage(sWeatherVibeEngine.Describe(*profile));
             handler->SendSysMessage("  covers: " + CoverageOf(*profile));
-            handler->SendSysMessage(Acore::StringFormat("  thunder here is {} | rain looks: {} | sandstorm looks: {}",
+            handler->SendSysMessage(Acore::StringFormat("  thunder here is {}, its tempest {} | rain looks: {} | sandstorm looks: {}",
                 WeatherVibeCore::WeatherStateName(profile->thunderAs),
+                WeatherVibeCore::WeatherStateName(WeatherVibeEngine::ResolveThunder(*profile, WV_STATE_TEMPEST)),
                 WeatherVibeCore::RainSkinName(profile->skins.rain), WeatherVibeCore::SandSkinName(profile->skins.sand)));
+            handler->SendSysMessage(Acore::StringFormat("  Waystone block {} | thunder made by the {}{}",
+                sWeatherVibeCore.IsExtensionEnabled() ? "on" : "off",
+                WeatherVibeCore::ThunderSourceName(sWeatherVibeCore.GetThunderSource()),
+                profile->hasFlashColor ? Acore::StringFormat(" | lightning colour {:06X}", profile->flashColor) : std::string()));
 
             if (!profile->neighbors.empty())
             {
@@ -402,6 +407,7 @@ public:
             "It stays until .wvibe audition off.", weatherId, grade, Density(grade) * 100.0f));
         handler->SendSysMessage("  the id picks the sound; the grade what falls (nothing at or below 0.25) and how dark the sky is (full from 0.25)");
         handler->SendSysMessage("  extra looks: 104 ash mist | 103 ember dust | 90 dark rain | 100 red rain | 86 rain with the thunder bed for its sound");
+        handler->SendSysMessage("  silent rows: 2 rain | 61 snow (what thin drizzle and flurries are sent as)");
         return true;
     }
 
@@ -484,10 +490,11 @@ public:
         handler->SendSysMessage("  .wvibe audition [clientWeatherId] [grade] | audition off  (look at any client weather, you only)");
         handler->SendSysMessage("  .wvibe lightning  (drop one bolt beside you)");
         Reply(handler, "states (number or name):");
-        handler->SendSysMessage("0 Fine | 1 Fog | 3 LightRain | 4 MediumRain | 5 HeavyRain");
+        handler->SendSysMessage("Clear | 0 Fine | 1 Fog | 3 LightRain | 4 MediumRain | 5 HeavyRain");
         handler->SendSysMessage("6 LightSnow | 7 MediumSnow | 8 HeavySnow");
         handler->SendSysMessage("22 LightSandstorm | 41 MediumSandstorm | 42 HeavySandstorm");
         handler->SendSysMessage("86 Thunders (the storm that suits the place) | ThunderSnow | DryThunders");
+        handler->SendSysMessage("Tempest (the worst storm the place gets) | Blizzard");
         return true;
     }
 

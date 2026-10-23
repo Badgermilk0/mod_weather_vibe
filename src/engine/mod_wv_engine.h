@@ -33,10 +33,10 @@ namespace WeatherVibe
     };
 
     // One stretch of a transition: a state shown while its grade goes from -> to.
-    //   streamed: the server moves the grade in small eased steps. Right for rain and for a
+    //   streamed: the server moves the grade in small eased steps. Right for rain, snow and a
     //             sky, which the client updates in place.
     //   one shot: the grade is set to its end value at the start and left alone, because the
-    //             client restarts snow and sandstorm from nothing on every packet about them.
+    //             stock client restarts a sandstorm from nothing on every packet about it.
     //             The client does the fading; the leg only waits for it.
     struct Leg
     {
@@ -67,7 +67,8 @@ namespace WeatherVibe
         WeatherState state = WEATHER_STATE_FINE;
         float        raw = 0.0f;
 
-        // Where the weather is settled, or heading.
+        // Where the weather is settled, or heading, and what it was when it set out.
+        WeatherState fromState = WEATHER_STATE_FINE;
         WeatherState targetState = WEATHER_STATE_FINE;
         float        targetPct = 100.0f;
         float        targetRaw = 0.0f;
@@ -106,9 +107,12 @@ namespace WeatherVibe
         std::vector<uint16>       neighbors;     // indices into the profile list
 
         // What a row that says "Thunders" (86) means here: a storm in the profile's own weather.
+        // A "Tempest" row is the worst of that weather (see ResolveThunder).
         WeatherState              thunderAs = WEATHER_STATE_THUNDERS;
         std::vector<uint32>       thunderSounds; // this profile's own claps; empty = the global ones
         WeatherSkins              skins;         // what its rain and sandstorm look like
+        bool                      hasFlashColor = false;
+        uint32                    flashColor = 0;  // 0xRRGGBB of its lightning on a Waystone client
 
         LiveState                 live;
     };
@@ -140,18 +144,28 @@ public:
     WeatherVibe::Profile const* Resolve(uint32 zoneId, uint32 areaId) const;
     // enteredZone: the player has just changed zone. The core may have sent that client weather
     // of its own on the way in, so what it was last told by the module is repeated where
-    // repeating is free (rain, a sky); snow and sandstorm are only ever sent on a change.
+    // repeating is free (rain, snow, a sky); a sandstorm is only ever sent on a change.
     void SendCurrentTo(Player* player, uint32 zoneId, uint32 areaId, bool enteredZone = false) const;
     void OnAreaChange(Player* player, uint32 oldArea, uint32 newArea) const;
     void ForEachListener(WeatherVibe::Profile const& profile, std::function<void(Player*)> const& visit) const;
     // One-shot push to the clients in a zone the module has no profile for. Returns how many got it.
     uint32 PushToZone(uint32 zoneId, WeatherState state, float rawGrade) const;
 
-    // 86 means "this profile's kind of thunder"; every other state is itself.
+    // 86 means "this profile's kind of thunder", and Tempest the worst of it: a tempest of rain,
+    // a blizzard, or the darkest dry storm. Every other state is itself.
     static WeatherState ResolveThunder(WeatherVibe::Profile const& profile, WeatherState state)
     {
-        return state == WEATHER_STATE_THUNDERS ? profile.thunderAs : state;
+        if (state == WEATHER_STATE_THUNDERS)
+            return profile.thunderAs;
+        if (state == WV_STATE_TEMPEST)
+            return profile.thunderAs == WEATHER_STATE_THUNDERS ? WV_STATE_TEMPEST
+                : profile.thunderAs == WV_STATE_THUNDER_SNOW ? WV_STATE_BLIZZARD : WV_STATE_DRY_THUNDERS;
+        return state;
     }
+
+    // What the client is sent for a profile right now: the id and grade every client reads,
+    // and the extension block a Waystone client reads besides. Read-only, safe from the hooks.
+    WeatherVibe::Wire WireOf(WeatherVibe::Profile const& profile) const;
 
     // --- Commands (world thread) ---
     std::vector<WeatherVibe::Profile> const& GetProfiles() const { return _profiles; }
@@ -180,20 +194,16 @@ private:
     void UpdateProfile(WeatherVibe::Profile& profile, uint32 diff);
     // A storm on screen or on its way here, or (Thunder.Rumble.Neighbors) in a neighbouring profile.
     bool StormInEarshot(WeatherVibe::Profile const& profile) const;
+    // A neighbouring profile has a storm up or coming.
+    bool StormNextDoor(WeatherVibe::Profile const& profile) const;
     void AdvanceTransition(WeatherVibe::Profile& profile, uint32 diff);
     void PickNext(WeatherVibe::Profile& profile);
     // mayStay: a pick of the profile's own may decide nothing needs to change on screen (a
-    // re-pick of the same snow, say). A GM's request always takes effect.
+    // re-pick of the same sandstorm, say). A GM's request always takes effect.
     void Begin(WeatherVibe::Profile& profile, WeatherState state, float pct, bool mayStay);
     void Settle(WeatherVibe::Profile& profile);
     void MarkDirty(WeatherVibe::Profile& profile);
     void FlushDirty();
-
-    // What the client is sent for a profile right now.
-    WeatherState WireOf(WeatherVibe::Profile const& profile) const
-    {
-        return sWeatherVibeCore.WireState(profile.live.state, profile.skins, profile.live.raw);
-    }
 
     void BuildTable(WeatherVibe::Profile const& profile, WeatherVibe::WeatherTable& out, bool useFronts) const;
     WeatherVibe::TransitionPlan PlanTransition(WeatherVibe::Profile const& profile,
@@ -222,6 +232,7 @@ private:
 
     bool _anyDirty = false;
     WeatherVibe::WeatherTable _scratchTable;
+    std::vector<WeatherVibe::Wire> _scratchWires;   // one per profile, for a broadcast pass
 };
 
 #define sWeatherVibeEngine WeatherVibeEngine::Instance()

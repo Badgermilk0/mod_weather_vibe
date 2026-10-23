@@ -5,7 +5,19 @@ is for whoever changes the code.
 
 ## Verification status
 
-As of 2026-10-12 the rework described here has been:
+**2026-10-23 pass (Waystone client, new states, climate):** the extension block, `Clear` /
+`Tempest` / `Blizzard`, streamed snow, silent drizzle, abrupt arrival after a loading screen
+and the reworked profile tables are compile-checked (all six translation units, MSVC `cl /Zs`,
+no warnings in module files), linted (`wv_lint.py`: 0 errors, 0 warnings) and run through
+`pick_test` (289 tables, 1,876 states, no hard problems; 1,858 within 50% of their weight,
+12 under half, none under a quarter). The block's layout and keys were read from the Waystone
+client's source (`CLIENT/wowdecomp - MODIFIED`: `WorldClient/WeatherModel.h`, the SMSG_WEATHER
+case in `Ui/GameUI.cpp`, `Awesome/AwesomeWeather.cpp`), and "the stock net layer ignores trailing
+bytes" and "snow does not restart" from the stock decomp (`NetClient::ProcessMessage`,
+`Weather::SetType`, `FillInDefaultPrecipTexturePath`). **None of it has been built into a
+worldserver or seen in game.**
+
+As of 2026-10-12 the rework described here had been:
 
 - **compile-checked** — every translation unit passes MSVC `cl /Zs` (full front-end analysis)
   against the workspace core, no errors and no warnings in module files;
@@ -67,9 +79,12 @@ Read from the stock tables; these facts shape several decisions below.
   with the ambience `DarkPortal` (sound 4994, `Sound\Ambience\ZoneAmbience\DarkPortal.wav`)
   in place of the rain loop. That file is no hum: 59 s of stereo low rumble with rolls swelling
   out of it (at about 2, 7, 24 and 39 s) - distant thunder, the unmodded game's storm sound.
-- **Extra rows nothing here used:** 104 (sandstorm motion, black, `SNOWMIST01` texture, silent),
+- **Extra rows:** 104 (sandstorm motion, black, `SNOWMIST01` texture, silent),
   103 (sandstorm, orange), 90 (rain motion, `LeafBrown` texture, silent — the core's "black
   rain"), 100 and 108 (rain, `RainDropRed01`). 103 and 105–107 have that last number at 0.
+- **Silent rows:** 2 (rain) and 61 (snow) have no sound and no texture of their own, so they
+  draw the ordinary drop and flake in silence. They are what thin rain and snow are sent as
+  (`Sound.SilentDrizzle`). 81 and 87 are silent rain too.
 - **378 of 715 lights have a separate storm parameter set.** Only there can the grade darken
   the sky; elsewhere Fine and Fog at any grade look the same.
 - **Thunder exists as doodad and spell sounds**, all in stock `common.mpq`. Measured from the
@@ -114,12 +129,15 @@ The packet is an id, a grade (0..1) and an "abrupt" flag.
    Fog (1) are the same thing to the client: no particles, no sound, a sky dimmed by the grade.
 4. **The client smooths the grade itself**, linearly, 0.1 per second (the whole range in ten
    seconds), starting from its previous target.
-5. **A change of particle type is a restart.** The client fades what is showing down to 0.25,
-   waits for the last particles to die, destroys the effect, creates the new one and fades it
-   in. Its check for what is showing (`0x783B60`) only knows the rain object, so it answers
-   "rain" or "nothing" — and **every snow or sandstorm packet is therefore taken as a change of
-   type and restarts the effect, even with the same id and the same grade.** Rain packets are
-   not: rain is updated in place.
+5. **A change of particle type or texture is a restart.** The client fades what is showing
+   down to 0.25, waits for the last particles to die, destroys the effect, creates the new one
+   and fades it in. `Weather::SetType` (`0x7846A0`) counts a change of texture as a change,
+   and fills in a default texture when the row has none — rain and snow have defaults
+   (`RainDrop01`, `SnowFlake01`), sandstorm has none. So **every sandstorm packet restarts the
+   effect, even with the same id and the same grade**; rain and snow are updated in place.
+   (An earlier reading here said the "what is showing?" check at `0x783B60` only knows rain,
+   and so that snow restarted too. It tests rain, snow and sand; re-read 2026-10-23 in the
+   decomp.)
 6. **A rain row with its own texture leaves it behind.** After ids 90 or 100, ordinary rain is
    drawn with their texture until a packet of another type clears it.
 
@@ -130,9 +148,48 @@ the rest follow from the rules and were not waited for.
 |---|---|
 | Rain could be heard with nothing falling | Rain's bands started at 0.25, where density is zero, and every fade between kinds of weather ran the old one down to that point with its id, and so its sound, still set (1, 2) |
 | Fine days were dark | Fine ran up to grade 0.30. A zone written as "20–50% clear" was sent 0.15–0.24: a sky 60% to 96% stormy (3) |
-| Snow and sandstorm pulse while changing, and restart at zone borders | A step every four seconds, and a resend on every zone change; each one a restart (5) |
+| Sandstorm pulses while changing, and restarts at zone borders | A step every four seconds, and a resend on every zone change; each one a restart (5) |
 | A dry storm has one look | Its band was 0.30–0.60, all of it past the point where the sky stops changing (3) |
 | A drizzle can roar | The loop followed the state's name, not how much was falling (1) |
+
+## The Waystone client
+
+The user's client (`CLIENT/wowdecomp - MODIFIED`, the 64-bit `WowClient64.exe`) reads an
+optional block after the stock packet fields: `uint32 'WVX1'`, `uint8 count`, then
+`count × {uint8 key, float value}` (`WorldClient/WeatherModel.h`; the key table with ranges is in
+its `MODIFICATIONS.md` under "Weather overhaul"). Three facts decide how the module uses it:
+
+- **A stock client ignores it.** `NetClient::ProcessMessage` hands the packet to the handler and
+  never checks that it was read to the end, so the block can go to every client.
+- **Each packet replaces the block**, and a packet without one puts the client back on its own
+  defaults. So every packet says everything it wants (`WeatherVibeEngine::WireOf`), and a
+  stock-style packet (an unmapped zone's clear sky) clears it.
+- **The client never says who it is.** There is no handshake, so the server cannot send stock
+  clients one thing and Waystone clients another. Everything in the block must leave a stock
+  client's picture unchanged — it does, since the stock id and grade are computed exactly as
+  before — and the one thing that cannot be shared, the thunder, is a realm-wide choice
+  (`Client.Thunder`).
+
+What the module sends (`WireOf`; `ClientExt` and the key names in `mod_wv_core.h`):
+
+| Key | When | From |
+|---|---|---|
+| sky (1) | always | `SkyFor()`: a sky's stock ramp; under precipitation `Look.Sky.<ground>` (pale at the first drop, dark as it thickens), at least 0.9 in any storm. During a sky leg towards or away from precipitation it is blended to meet the precipitation's first sky at the floor, so clouding over does not overshoot to the stock full storm and jump back |
+| density (3) | when not 1 | `Look.<State>.Density` over the band |
+| transition (5) | always | a streamed leg: one tick; a one-shot leg: its length; otherwise 6 s; 0 on an abrupt packet |
+| duck (19) | when the state has one | `Look.<State>.Duck` |
+| lightning (4), storm (13) | a thunder state is up | `Look.<State>.Lightning` / `.Storm` over the band |
+| lightning, strike distances (7, 8), near chance (11), burst (12), rumble (16) | a storm coming or going (rate ramps with the transition), or one next door (`Look.DistantStorm.*`) | far strikes only, 1800–3000 yd |
+| flash colour (21), near / far kits (17, 18) | with lightning | the profile's `Lightning.Color`, `Thunder.Sounds` |
+| lightning = 0 | `Client.Thunder = server`, or thunder off | so the client adds none of its own |
+| thunder = 0 (10), rumble kit = 0 (15) | `Client.Thunder = both` | the server's claps and rumble play instead |
+
+Particles (2) are never sent: the grade already says them, the same for every client.
+
+What is compared. A client's record holds the block it was sent; `ClientExt::SameAs` compares
+everything but the transition time (how a change is made, not what it is), with a small
+tolerance on values and exactly on ids and colours. A change of block alone is sent — except
+over a sandstorm, where only a real change of the weather is worth the stock client's restart.
 
 ## Decisions
 
@@ -165,22 +222,29 @@ depending on mod-playerbots.
 
 ### A client is told only what is new to it
 
-Because of rule 5, a packet is not free: an unneeded one makes snow or a sandstorm fade out
-and come back. So every packet for a mapped place leaves through one function,
-`WeatherVibeCore::Deliver(player, id, grade, why)`, which keeps the last id and grade it sent
-that player in the player's own `CustomData` (`SentWeather`, key `WeatherVibe.Sent`) and
-compares first. `why` is a `Tell`:
+Because of rule 5, a packet is not free: an unneeded one makes a sandstorm fade out and come
+back. So every packet for a mapped place leaves through one function,
+`WeatherVibeCore::Deliver(player, wire, why)`, which keeps the last id, grade and extension
+block it sent that player in the player's own `CustomData` (`SentWeather`, key
+`WeatherVibe.Sent`) and compares first. `why` is a `Tell`:
 
 | `Tell` | Used by | Sends when |
 |---|---|---|
 | `CHANGE` | the broadcast pass, for a profile whose weather moved | the client was not last told exactly this |
-| `ARRIVAL` | the area hook, a reload, the reconcile pass | as `CHANGE` — but snow or a sandstorm with the same id and a grade within `RESTART_NOT_WORTH` (0.08) of what the client has is left alone |
-| `REPEAT` | the zone hook, `ReApply` | as `ARRIVAL` — and rain or a sky is said again even when unchanged |
+| `ARRIVAL` | the area hook, a reload, the reconcile pass | as `CHANGE` — but a sandstorm with the same id and a grade within `RESTART_NOT_WORTH` (0.08) of what the client has is left alone, whatever its block |
+| `REPEAT` | the zone hook, `ReApply` | as `ARRIVAL` — and rain, snow or a sky is said again even when unchanged |
+
+**No record means a fresh client.** A player who has just logged in, or come through a loading
+screen (`OnPlayerMapChanged` calls `Forget(player, true)`, which erases the record), is sent the
+weather with the abrupt flag set and a zero transition, so it is already up when the screen
+lifts instead of fading in over ten seconds. Every other `Forget` (an unmapped zone, the core's
+weather, an audition) keeps the record but marks it not valid: the next packet is always sent,
+but as a fade — walking out of an unmapped zone into rain does not pop it in.
 
 What follows from it:
 
-- Walking Dun Morogh → Ironforge, or between any two zones on one profile, sends a client in
-  snow nothing. Before, it restarted the snow at every gate.
+- Walking between any two zones on one profile, in a sandstorm, sends that client nothing.
+  Before, it restarted the sandstorm (and, under the old reading, the snow) at every border.
 - The zone hook repeats rain and skies because the core may have sent that client weather of
   its own on the way in (`Player::UpdateZone` calls `Map::SendZoneDynamicInfo` just before the
   hook), and repeating those costs nothing on screen. With `ActivateWeather` left on the core
@@ -188,10 +252,12 @@ What follows from it:
 - The record is dropped on a map change (`OnPlayerMapChanged`: the client starts over behind a
   loading screen), on entering an unmapped zone, after `.wvibe audition`, and after a one-off
   push to an unmapped zone.
-- **The reconcile pass.** Snow and sandstorm are sent once, so a client that missed that one
-  packet would keep the wrong weather until the next change. Every 20 s (`RECONCILE_MS`)
+- **The reconcile pass.** A sandstorm is sent once, so a client that missed that one packet
+  would keep the wrong weather until the next change. Every 20 s (`RECONCILE_MS`)
   `FlushDirty()` holds every client's record against what it should be showing. It sends
-  nothing to the ones that are right, which is all of them unless something went wrong.
+  nothing to the ones that are right, which is all of them unless something went wrong. It is
+  also what brings a storm next door to the horizon: a neighbour's weather does not mark this
+  profile dirty, so its distant lightning arrives with the next reconcile.
 - **Texture left behind** (rule 6): when the last id sent was a rain skin and ordinary rain is
   due, `Deliver` sends a sky packet first to clear it.
 
@@ -203,9 +269,10 @@ but the choice of sound (rule 1), it is picked for the sound, by how much is fal
 
 | What is falling | Grade | Sent as |
 |---|---|---|
-| nothing — a sky (`Fine`) | any | 0 |
+| nothing — a sky (`Clear`, `Fine`) | any | 0 |
 | nothing — a sky (`Fog`, `DryThunders`) | any | 1 |
-| rain, snow or sand too thin to see | below `Sound.From.Light` (0.29) | 0: it looks the same, and it is silent |
+| thin rain or snow | above the floor, below `Sound.From.Light` (0.29) | 2 or 61, the silent rows (`Sound.SilentDrizzle`; dark rain stays 90, red rain is 0) |
+| sand too thin to hear, or anything at the floor | below `Sound.From.Light` | 0: it looks the same, and it is silent |
 | light | from `Sound.From.Light` | rain 3, snow 6, sandstorm 41 |
 | medium | from `Sound.From.Medium` (0.50) | rain 4, snow 7, sandstorm 42 |
 | heavy | from `Sound.From.Heavy` (0.68) | rain 5, snow 8, sandstorm 22 |
@@ -214,17 +281,19 @@ but the choice of sound (rule 1), it is picked for the sound, by how much is fal
 
 A state's name does not choose the loop: `HeavyRain` at 5% of its band is sent as 4, and
 `Thunders` (the client's own 86 swaps the rain loop for its thunder bed, so it is never sent;
-the server plays that bed itself, see the rumble below) and
-`ThunderSnow` climb the same ladder as the rain and snow they are drawn as. The sandstorm ids
-are in that order because the client's table has its loops crossed. The first row of
-precipitation is what stops sound without particles: at 0.29 about 5% of full density is
-falling, some 230 raindrops.
+the server or the Waystone client plays that bed itself, see the rumble below),
+`ThunderSnow`, `Tempest` and `Blizzard` climb the same ladder as the rain and snow they are
+drawn as. The sandstorm ids are in that order because the client's table has its loops
+crossed. The first loop is what stops sound without particles: at 0.29 about 5% of full density
+is falling, some 230 raindrops; below it the silent rows show the drizzle without a sound.
+Switching 2 → 3 is a change of id only (same type, no texture), so the drizzle turns into rain
+without a restart.
 
 During one stretch of a transition the grade only moves one way, and a hold does not move it
 at all, so a threshold is crossed once and the loop never flutters.
 
-The hook reports module states (`HookState`): any thunder is 86, a skinned sandstorm is still
-22/41/42. `.wvibe audition` bypasses all of this and sends a raw client id to one GM, who is
+The hook reports module states (`HookState`): any thunder (a tempest too) is 86, `Clear` is 0,
+a `Blizzard` 8, a skinned sandstorm is still 22/41/42. `.wvibe audition` bypasses all of this and sends a raw client id to one GM, who is
 then skipped by every send point until they switch it off.
 
 ### Thunder is the module's
@@ -233,12 +302,23 @@ A row that says 86 means "the storm that suits this profile". `LoadProfile()` de
 the profile's tables — rain rows make it `Thunders`, snow without rain `ThunderSnow`, neither
 `DryThunders` — and rewrites the rows (`ResolveThunder`); `Thunder.Style` overrides, and a row
 may name `ThunderSnow` or `DryThunders` outright. Before this, 17 of the 60 profiles with
-thunder had no rain rows at all, seven of them frozen zones, and got raindrops.
+thunder had no rain rows at all, seven of them frozen zones, and got raindrops. A `Tempest`
+row is the worst of the same storm: `Tempest`, `Blizzard` or `DryThunders`. The six dry lands
+with a rare shower in their tables (Badlands, Blasted Lands, Durotar, the Barrens, Westfall,
+Tanaris) set `Thunder.Style = dry`: their storms are heat lightning, not downpours.
 
-While a thunder state is on screen, `UpdateProfile()` runs a timer and
+**Who makes it** is `Client.Thunder`. `client` (the default): the Waystone client's own
+lightning, through the block (above); the server's timer, claps, rumble and bolts below do not
+run (`WeatherVibeWorld::IsThunderEnabled()` is false). `server`: the server's, and the block
+says lightning 0. `both`: the server's, and the block asks for the client's flashes with its
+thunder and rumble muted. Without the block (`Client.Extension = 0`) it is always `server`.
+
+While a thunder state is on screen and the server makes the thunder, `UpdateProfile()` runs a
+timer and
 `WeatherVibeWorld::Thunder()` plays a clap: one sound id for the whole profile, sent to each
 listener with `PlayDirectSound(id, player)`. The gap runs from `IntervalSeconds.Max` down to
-`.Min` as intensity rises. Loud entries (`Sounds.Near`) are favoured in a hard storm and quiet
+`.Min` as the storm rises (`Look.<State>.Storm` over the band, the same scale the Waystone
+client is given, so a tempest claps near the minimum from the start). Loud entries (`Sounds.Near`) are favoured in a hard storm and quiet
 ones (`Sounds.Far`) in a light one, which is the only "distance" a 2D sound can have. A
 listener indoors (`!IsOutdoors()`) gets a `Sounds.Far` clap in place of a near one, since a
 2D sound ignores walls; a profile with its own `Thunder.Sounds` plays them everywhere.
@@ -265,34 +345,35 @@ the next reload and say so once.
 ### Transitions follow what the client can show
 
 The engine works in the grade (0..1), not in percentages. Every state is put in one of four
-groups by what the client draws for it (`GroundOf`): **sky** (Fine, Fog, `DryThunders`),
-**rain** (the rain tiers and `Thunders`), **snow** (the snow tiers and `ThunderSnow`) and
-**sand**. Grade 0.25 — `CLIENT_PARTICLE_FLOOR` — is where they all meet: below it only the sky
+groups by what the client draws for it (`GroundOf`): **sky** (Clear, Fine, Fog, `DryThunders`),
+**rain** (the rain tiers, `Thunders`, `Tempest`), **snow** (the snow tiers, `ThunderSnow`,
+`Blizzard`) and **sand**. Grade 0.25 — `CLIENT_PARTICLE_FLOOR` — is where they all meet: below it only the sky
 changes, at it the sky is fully stormy and nothing falls yet (rules 2 and 3). A sky clouds
 over up to the floor; rain, snow and sand thin down to it.
 
 `PlanTransition()` builds at most two legs, of two kinds:
 
 - a **streamed** leg: the server moves the grade in small eased steps
-  (`Transition.TickSeconds`). Right for a sky and for rain, which the client updates in place;
+  (`Transition.TickSeconds`). Right for a sky, rain and snow, which the client updates in place;
 - a **one-shot** leg: the grade is set to where it is going at the start and left there. The
-  only thing possible for snow and sandstorm, which restart on every packet (rule 5). The
-  client does the fading; the leg just waits for it (`ClientFadeMs`, plus 4 s for the last
+  only thing possible for a sandstorm, which restarts on every packet (rule 5). The client
+  does the fading; the leg just waits for it (`ClientFadeMs`, plus 4 s for the last
   particles).
 
 | From → to | Path |
 |---|---|
-| sky → sky, rain → rain | one streamed leg; across two states, two halves with the state swapping in the middle |
-| sky → rain | the sky streams up to the floor (clouding over), the rain streams up from it |
-| rain → sky | the rain streams down to the floor (sent as sky for the last of it, so the sound goes with the last drops), the sky streams down from it |
-| sky or rain → snow or sand | the old weather streams to the floor, then one shot |
-| snow or sand → sky or rain | nothing is sent about the snow at all: the new weather streams from the floor, and its first packet makes the client fade the snow out by itself |
-| snow → snow, sand → sand | one shot. When a profile picks the same state again, or one whose id is the same and grade within `RESTART_NOT_WORTH`, nothing is sent and the grade stays as it is (`TransitionPlan::keepGrade`) |
-| snow ↔ sand | one shot |
+| sky → sky, rain → rain, snow → snow | one streamed leg; across two states, two halves with the state swapping in the middle |
+| sky → rain or snow | the sky streams up to the floor (clouding over), the precipitation streams up from it, silent until the first loop |
+| rain or snow → sky | the precipitation streams down to the floor (the last of it silent, so the sound goes before the last drops), the sky streams down from it |
+| rain ↔ snow | the old one streams down to the floor, the new one up from it (one restart, at the floor, where nothing is falling) |
+| sky, rain or snow → sand | the old weather streams to the floor, then one shot |
+| sand → sky, rain or snow | nothing is sent about the sand at all: the new weather streams from the floor, and its first packet makes the client fade the sand out by itself |
+| sand → sand | one shot. When a profile picks the same state again, or one whose id is the same and grade within `RESTART_NOT_WORTH`, nothing is sent and the grade stays as it is (`TransitionPlan::keepGrade`) |
 
-So heavy rain becomes a thunderstorm by getting heavier, with no lull; snow arrives once and
-is not touched again until it really changes; and one client-side dip per real change of snow
-intensity is what remains. It cannot be avoided from the server.
+So heavy rain becomes a thunderstorm, and a thunderstorm a tempest, by getting heavier, with no
+lull; snow builds up flake by flake like rain; a sandstorm arrives once and is not touched
+again until it really changes, and one client-side dip per real change of sandstorm intensity
+is what remains (on a stock client; a Waystone client with `weatherFixes` has none).
 
 A GM's `set` and `force` pass `mayStay = false`: they always take effect, restart or not.
 
@@ -313,16 +394,21 @@ The shipped bands (also the code defaults, `kStates`) are placed by rules 2 and 
 
 | State | Band | Is |
 |---|---|---|
+| `Clear` | 0.00 – 0.02 | not a cloud, at most a wisp (8% of the storm sky) |
 | Fine | 0.00 – 0.125 | clear to half the storm sky |
 | Fog | 0.10 – 0.25 | a grey sky to the full storm sky |
 | `DryThunders` | 0.20 – 0.25 | the darkest sky |
-| Light / Medium / Heavy rain, sandstorm | 0.30 – 0.50 / 0.45 – 0.70 / 0.62 – 0.95 | 7–33% / 27–60% / 49–93% of full density |
-| Light / Medium / Heavy snow | 0.32 – 0.52 / 0.48 – 0.74 / 0.66 – 1.00 | snow has a fifth of rain's particles, so it sits higher |
+| Light rain | 0.27 – 0.50 | 3–33% of full density; below 0.29 a silent drizzle |
+| Medium / Heavy rain, sandstorm | 0.45 – 0.70 / 0.62 – 0.95 | 27–60% / 49–93% of full density |
+| Light sandstorm | 0.30 – 0.50 | 7–33% (no silent row, so it starts at the first loop) |
+| Light / Medium / Heavy snow | 0.28 – 0.52 / 0.48 – 0.74 / 0.66 – 1.00 | snow has a fifth of rain's particles, so it sits higher; the lowest light snow is silent flakes |
 | `Thunders` | 0.60 – 0.95 | a downpour |
-| `ThunderSnow` | 0.66 – 1.00 | a blizzard |
+| `ThunderSnow` | 0.66 – 1.00 | heavy snow under thunder |
+| `Tempest` | 0.88 – 1.00 | the most rain the stock client draws (up to twice that on Waystone) |
+| `Blizzard` | 0.86 – 1.00 | the most snow (up to twice that on Waystone) |
 
-A Fine row's percentage is clearness: `PercentToRaw` maps 100% to the band's minimum and 0% to
-its maximum. (The original ignored the band and sent `1 − pct`, so profiles authored with Fine
+A Clear or Fine row's percentage is clearness: `PercentToRaw` maps 100% to the band's minimum
+and 0% to its maximum. (The original ignored the band and sent `1 − pct`, so profiles authored with Fine
 at 20–50% went out at grade 0.5–0.8.) Fine stops at 0.125 on purpose: the profiles were
 written with fine days at 20–60% clear, and with the old 0.30 that was most of a storm sky.
 Gloomy zones keep their gloom through their Fog rows.
@@ -346,6 +432,13 @@ does not shift when the clock crosses into the next daypart.
   the table, `Thunders` counts as the top of the rain ladder; with medium or heavy snow,
   `ThunderSnow` tops the snow ladder. Without them, and always for `DryThunders`, thunder is
   calm weather that may follow anything light.
+- **The tops of the scale are tier 4** (`GetTier`): `Tempest` sits above heavy rain and a
+  coupled `Thunders`, `Blizzard` above heavy snow. Reached and left one tier at a time like the
+  rest, so the absolute storm only ever grows out of a downpour and eases back into one.
+- **A cloudless sky borders only Fine and Fog.** Rain clears to fair weather before it clears
+  to nothing, and nothing clouds straight into rain from `Clear`. Symmetric, as the balancing
+  needs; it makes Fine the bottleneck into `Clear`, which the balancing then pays for with
+  longer stays.
 
 The rule is deliberately **symmetric** (if A may follow B, B may follow A), because the next
 part depends on it.
@@ -362,6 +455,9 @@ share of weight:
 
 Under the original rules, Elwynn's spring heavy rain (4.3% of the weight) was picked 0.1% of
 the time. This was true of the module as it shipped, not something the rework introduced.
+
+With the new states and the climate pass (2026-10-23): 1,876 state rows, 1,535 within 25%,
+1,858 within 50%, 12 under half, none under a quarter.
 
 `PickEntry()` fixes it with a Metropolis–Hastings acceptance step. Propose a natural neighbour
 by weight; accept a move with probability `min(1, reach(here) / reach(there))`, where
@@ -475,17 +571,24 @@ thread.
 
 ## Known limits
 
-- **Snow and sandstorm cannot build up gradually.** Every packet restarts them, so they arrive
-  at their grade in one client-side fade (a few seconds) and change by fading out and in. Rain
-  and the sky are the only weather the server can move smoothly.
-- **Thin precipitation is not drawn.** Below `Sound.From.Light` rain is sent as a stormy sky.
-  At that grade about one drop in twenty of a full downpour would be falling.
+- **A sandstorm cannot build up gradually.** Every packet restarts it on a stock client, so it
+  arrives at its grade in one client-side fade (a few seconds) and changes by fading out and
+  in. The Waystone client does not restart it, but the server cannot tell the clients apart.
+- **Thin sand is not drawn.** Below `Sound.From.Light` a sandstorm is sent as a stormy sky
+  (there is no silent sand row other than the black 104).
+- **The server cannot tell a Waystone client from a stock one.** Everything in the block is
+  invisible to a stock client, but the thunder cannot be split: with `Client.Thunder = client`
+  a stock client hears none, with `both` a Waystone client's thunder is the server's flat claps.
+  A handshake (the client announcing itself, e.g. with an addon message the module listens for)
+  would let each get the best; it needs a change on the client side.
+- **The Waystone client's own CVars still apply.** `weatherLightning 0`, `weatherThunder 0` or a
+  low `weatherDensityScale` there override what the block asks for; that is the player's call.
 - **The module only knows what it sent.** Weather sent to a client by anything else — the core
   with `ActivateWeather = 1`, a script through `Map::SetZoneWeather` — is not in the record. The
   zone hook repeats rain and skies to cover it, and drops the record when the core's weather is
-  on. What is not covered: a *mapped* zone, in *unchanged snow or sandstorm*, for which a
+  on. What is not covered: a *mapped* zone, in an *unchanged sandstorm*, for which a
   script has set zone music, light or weather through the core. The core then sends its own
-  weather packet on the way in and the module does not say its snow again until it changes.
+  weather packet on the way in and the module does not say its sandstorm again until it changes.
 - **The skin texture fix is unseen.** Sending a sky packet before ordinary rain (rule 6) is
   what the client's code calls for; it has not been watched working.
 - A zone mapped here that a core script also drives (Isle of Quel'Danas has both) shows the
@@ -495,8 +598,9 @@ thread.
   the module in that zone.
 - Area ids must be the innermost area. The Argent Tournament grounds needed eight.
 - The season table is northern-hemisphere and the same for every zone.
-- Client ids 90, 100, 103 and 104 are reachable only as skins. 106 ("black snow", the Lich
-  King's) and the rest of `Weather.dbc` are not driven at all; `.wvibe audition` shows them.
+- Client ids 90, 100, 103 and 104 are reachable only as skins, 2 and 61 only as thin rain and
+  snow. 106 ("black snow", the Lich King's) and the rest of `Weather.dbc` are not driven at
+  all; `.wvibe audition` shows them.
 - A 2D clap has no direction or distance and ignores walls. Indoors the far clap stands in
   for a near clap, but it is not muffled: the client's occlusion low-pass only acts on 3D
   sounds (the lightning object's thunder is one).
@@ -529,15 +633,18 @@ In game, after a build and deploy:
 4. Fly into a zone with no other players: the weather is already right, no snap a few seconds later.
 5. Enter a raid mid-encounter where a boss sets weather: it is not wiped.
 6. `.wvibe force here 5 80` from a clear sky, watching `.wvibe status here`: the sky clouds
-   over first (id 0, grade rising to 0.25), then rain appears and thickens. **It is silent
-   until drops are visible**, then the light loop, the medium, the heavy.
+   over first (id 0, grade rising to 0.25), then a silent drizzle (id 2), then rain thickens
+   with the light loop, the medium, the heavy. On Waystone the sky does not go fully dark
+   before the rain and then lighten: it meets the rain's own sky.
 7. `.wvibe force here 0 100` from that rain: the sound stops as the last drops go, not after;
    then the sky clears.
 8. `.wvibe debug on` and wait for a Light → Medium change: one continuous move.
-9. In Dun Morogh, `.wvibe force here 7 60` from clear: the sky clouds over, then snow arrives
-   **once** and stays. Nothing pulses while `.wvibe status here` still shows time to go.
-10. Walk Dun Morogh ↔ Ironforge through the gates in snow, and Elwynn ↔ Stormwind in rain:
-    nothing restarts, nothing clears.
+9. In Dun Morogh, `.wvibe force here 7 60` from clear: the sky clouds over, a few silent
+   flakes (id 61), then the snow **builds** - no fade-out and back while it does. (If it pulses,
+   the stock-client reading of rule 5 is wrong after all for this client: say so.) In Tanaris,
+   `.wvibe force here 41 60`: the sandstorm arrives **once** and stays.
+10. Walk Dun Morogh ↔ Ironforge through the gates in snow, Elwynn ↔ Stormwind in rain, and
+    across Tanaris' borders in a sandstorm: nothing restarts, nothing clears.
 11. `.wvibe force here 0 100`, then `.wvibe force here 0 0`, on a clear day somewhere with a
     storm sky (Elwynn has one): 0% is lightly clouded, not dark. Then
     `.wvibe force here DryThunders 100`: clearly darker than both.
@@ -549,8 +656,10 @@ In game, after a build and deploy:
 15. Walk into Felstone Field in the Western Plaguelands: the haze thickens; walk out: it lifts.
 16. A Lua handler on server event 25 prints the zone and state when weather settles.
 17. Stand by a guard through a change of weather a few times: occasionally a line, never spam.
-18. `.wvibe force here 86 80` in Elwynn: a downpour, a clap every half minute or so, no hum.
-    The same in Icecrown: snow and thunder, no raindrops. In Netherstorm: a dark sky, crackle.
+18. `.wvibe force here 86 80` in Elwynn: a downpour with the Waystone client's lightning
+    (`Client.Thunder = client`), no hum. The same in Icecrown: snow and thunder, no raindrops.
+    In Netherstorm: a dark sky, violet flashes, crackle. With `Client.Thunder = server`: a clap
+    every half minute or so instead, and no flashes.
 19. Heavy rain → Thunders with `.wvibe debug on`: the grade only rises; no lull, and the rain
     loop steps up with it.
 20. `.wvibe audition 104 0.6`, then 103, 90, 100: each look, to you alone. `.wvibe audition off`.
@@ -558,8 +667,17 @@ In game, after a build and deploy:
 22. Walk Wetlands → Thandol Span → Arathi in rain: the sky does not clear on the bridge.
 23. Swim out from Westfall: the sea has weather.
 24. Walk into Raven Hill Cemetery: the fog closes in. Light's Hope Chapel: it lifts.
-25. Teleport out of a snowing zone and back (`.tele`): the snow is there again on arrival.
-26. The calibration table in the README.
+25. Teleport out of a snowing zone and back (`.tele`): the snow is there **at once** when the
+    loading screen lifts, not fading in.
+26. `.wvibe force here 5 95` in Stranglethorn, then `.wvibe force here Tempest 100`: on Waystone
+    the rain thickens to about twice the stock maximum, lightning every few seconds, many of
+    them close, the jungle's own sounds pushed down. `.wvibe force here 0 100` afterwards: the
+    tempest eases through heavy rain, not straight to dry.
+27. `.wvibe force here Clear 100` anywhere with a storm sky: no cloud at all. `.wvibe simulate
+    Tanaris 500`: Clear and Fine most of the time, sandstorm a third, rain about 1%.
+28. A storm in Elwynn (`.wvibe force ElwynnForest 86 80`) seen from Westfall in clear weather:
+    within 20 s, far-off flashes and a low rumble on the Waystone client, nothing close.
+29. The calibration table in the README.
 
 ## Where to edit
 
@@ -573,7 +691,9 @@ In game, after a build and deploy:
 | Anything about what the client does with a packet | the constants at the top of `mod_wv_core.h` (`CLIENT_PARTICLE_FLOOR`, `CLIENT_GRADE_PER_SECOND`, `RESTART_NOT_WORTH`) and `RestartsOnPacket()` — and the section above that says where each was read |
 | Which sound goes with how much rain | `WeatherVibe.Sound.From.*` in the conf; `WireState()` |
 | A new config key | read it in `LoadGlobals()` / `LoadProfile()` / `WeatherVibeCore::LoadConfig()`, add it to the conf **and** to `known_keys` or a pattern in `wv_lint.py` |
-| A new weather state | `kStates` and `WireState()` in `mod_wv_core.cpp` (and `WV_STATES`), the family/tier/ground switches in `mod_wv_pick.cpp`, `kDefaultHold` in `mod_wv_engine.cpp`, the tables in `wv_lint.py`, `Name()` in `pick_test.cpp` |
+| A new weather state | `kStates`, `kLook` and `WireState()` in `mod_wv_core.cpp` (and `WV_STATES`), the family/tier/ground switches in `mod_wv_pick.cpp`, `kDefaultHold` in `mod_wv_engine.cpp`, the tables in `wv_lint.py`, `Name()` and `ParseState()` in `pick_test.cpp` |
+| What a Waystone client is told | `WireOf()` in `mod_wv_engine.cpp`; the defaults in `kLook` and `LoadLookConfig()` in `mod_wv_core.cpp`; key ranges in the client's `WeatherModel.h` |
+| Who makes the thunder | `Client.Thunder`; `IsThunderEnabled()` in `mod_wv_world.h` (the server's), the lightning block in `WireOf()` (the client's) |
 | What the client is sent for a state; a new skin | `WireState()` in `mod_wv_core.cpp` — check the id with `wv_client_data.py weather` first |
 | When thunder plays, and which sound | the thunder block in `UpdateProfile()`; `Thunder()` in `mod_wv_world.cpp` |
 | Where a bolt may land | `StrikeLightningNear()` in `mod_wv_world.cpp` |

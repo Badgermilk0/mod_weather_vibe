@@ -164,13 +164,15 @@ WeatherTurn WeatherVibeWorld::ClassifyTurn(WeatherState previous, WeatherState n
     Family const was = GetFamily(previous);
     Family const is = GetFamily(now);
 
-    if (is == Family::THUNDER || (GetTier(now) == 3 && GetTier(previous) < 3))
+    // Thunder, heavy weather arriving, and heavy weather turning into a tempest or a blizzard.
+    if (is == Family::THUNDER || (GetTier(now) >= 3 && GetTier(previous) < GetTier(now)))
         return WeatherTurn::STORM;
 
-    // A storm easing back into the rain or snow it was made of is not news.
+    // A storm easing back into the rain or snow it was made of is not news, and neither is a
+    // fair sky clearing the last of its cloud.
     switch (is)
     {
-    case Family::FINE:      return WeatherTurn::CLEAR;
+    case Family::FINE:      return was == Family::FINE ? WeatherTurn::NONE : WeatherTurn::CLEAR;
     case Family::FOG:       return WeatherTurn::FOG;
     case Family::RAIN:      return (was == Family::RAIN || previous == WEATHER_STATE_THUNDERS) ? WeatherTurn::NONE : WeatherTurn::RAIN;
     case Family::SNOW:      return (was == Family::SNOW || previous == WV_STATE_THUNDER_SNOW) ? WeatherTurn::NONE : WeatherTurn::SNOW;

@@ -33,15 +33,17 @@ namespace WeatherVibe
         case WEATHER_STATE_LIGHT_RAIN:
         case WEATHER_STATE_MEDIUM_RAIN:
         case WEATHER_STATE_HEAVY_RAIN:
-        case WEATHER_STATE_THUNDERS:         return Ground::RAIN;
+        case WEATHER_STATE_THUNDERS:
+        case WV_STATE_TEMPEST:               return Ground::RAIN;
         case WEATHER_STATE_LIGHT_SNOW:
         case WEATHER_STATE_MEDIUM_SNOW:
         case WEATHER_STATE_HEAVY_SNOW:
-        case WV_STATE_THUNDER_SNOW:          return Ground::SNOW;
+        case WV_STATE_THUNDER_SNOW:
+        case WV_STATE_BLIZZARD:              return Ground::SNOW;
         case WEATHER_STATE_LIGHT_SANDSTORM:
         case WEATHER_STATE_MEDIUM_SANDSTORM:
         case WEATHER_STATE_HEAVY_SANDSTORM:  return Ground::SAND;
-        default:                             return Ground::SKY;   // Fine, Fog, DryThunders
+        default:                             return Ground::SKY;   // Clear, Fine, Fog, DryThunders
         }
     }
 
@@ -52,10 +54,12 @@ namespace WeatherVibe
         case WEATHER_STATE_FOG:              return Family::FOG;
         case WEATHER_STATE_LIGHT_RAIN:
         case WEATHER_STATE_MEDIUM_RAIN:
-        case WEATHER_STATE_HEAVY_RAIN:       return Family::RAIN;
+        case WEATHER_STATE_HEAVY_RAIN:
+        case WV_STATE_TEMPEST:               return Family::RAIN;
         case WEATHER_STATE_LIGHT_SNOW:
         case WEATHER_STATE_MEDIUM_SNOW:
-        case WEATHER_STATE_HEAVY_SNOW:       return Family::SNOW;
+        case WEATHER_STATE_HEAVY_SNOW:
+        case WV_STATE_BLIZZARD:              return Family::SNOW;
         case WEATHER_STATE_LIGHT_SANDSTORM:
         case WEATHER_STATE_MEDIUM_SANDSTORM:
         case WEATHER_STATE_HEAVY_SANDSTORM:  return Family::SANDSTORM;
@@ -80,8 +84,15 @@ namespace WeatherVibe
         case WEATHER_STATE_HEAVY_RAIN:
         case WEATHER_STATE_HEAVY_SNOW:
         case WEATHER_STATE_HEAVY_SANDSTORM:    return 3;
+        case WV_STATE_TEMPEST:
+        case WV_STATE_BLIZZARD:                return 4;
         default:                               return 0;
         }
+    }
+
+    bool IsClearSky(WeatherState state)
+    {
+        return state == WEATHER_STATE_FINE || state == WV_STATE_CLEAR;
     }
 
     bool IsContinuousPair(WeatherState a, WeatherState b)
@@ -126,6 +137,14 @@ namespace WeatherVibe
                 return std::abs(int(candidateTier) - int(currentTier)) <= 1;
 
             return candidateTier == 1;
+        }
+
+        // A cloudless sky is only ever next to a fair or misty one: rain clears to fine weather
+        // before it clears to nothing, and nothing clouds straight into rain.
+        if (current == WV_STATE_CLEAR || candidate == WV_STATE_CLEAR)
+        {
+            WeatherState const other = current == WV_STATE_CLEAR ? candidate : current;
+            return other == WEATHER_STATE_FINE || other == WEATHER_STATE_FOG;
         }
 
         Kind const from = Classify(current, coupling);

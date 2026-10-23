@@ -24,19 +24,31 @@ reworked here. Demos of the original: <https://youtu.be/GRyTk5umEno>, <https://y
   zone it stands for.
 - **Every map.** Open world, battlegrounds, raids and dungeons all work the same way.
 - **Only real players are told.** Playerbots never receive a weather packet.
-- **Smooth changes.** Rain and the sky move continuously in small eased steps. Light rain
-  becomes medium rain without a dip; a clear sky clouds over before the first drops.
+- **Smooth changes.** Rain, snow and the sky move continuously in small eased steps. Light
+  rain becomes medium rain without a dip; a clear sky clouds over, a silent drizzle starts,
+  then the rain.
 - **Built on how the client really draws weather.** The 3.3.5a client's weather code was read,
   not guessed at. Rain is never heard before it can be seen, the sound always matches how much
-  is falling, fine days are bright, and snow and sandstorms are not made to flicker (the client
+  is falling, fine days are bright, and sandstorms are not made to flicker (the client
   restarts those every time it is told about them, so it is told once).
+- **The whole scale.** From a cloudless sky (`Clear`) through fair days, mist, showers and
+  downpours to the absolute storm (`Tempest`) and the `Blizzard`, each where it belongs: deserts
+  bake under clear skies and almost never see rain, the gloomy lands never truly clear, the
+  jungles, coasts and open sea get the tempests, the high north the blizzards.
 - **One step at a time.** From a calm sky weather starts light; medium follows light, heavy
-  follows medium, and it eases off the same way. A thunderstorm grows out of real rain.
-- **Real thunderstorms.** The game client has none: what the core calls "Thunders" is rain with
-  its thunder bed in place of the rain sound. Here a storm is a downpour, a blizzard or a dark
-  dry sky, whichever suits the zone, with real thunderclaps played by the server over the rain,
-  and the client's own distant rumble under them - heard from the next zone before a storm
-  arrives. Optionally, lightning bolts.
+  follows medium, a tempest only grows out of a downpour or a thunderstorm, and it eases off
+  the same way. A cloudless sky only follows a fair one.
+- **Real thunderstorms.** The stock client has none: what the core calls "Thunders" is rain
+  with its thunder bed in place of the rain sound. Here a storm is a downpour, thundersnow or a
+  dark dry sky, whichever suits the zone. On the Waystone client it brings the client's own
+  lightning - flashes, layered thunder that arrives late from far strikes, fel-green in fel
+  lands, violet in Netherstorm, orange through volcanic ash - and storms next door flicker on
+  the horizon before they arrive. On a stock client the server plays the thunderclaps and the
+  distant rumble instead (`WeatherVibe.Client.Thunder`).
+- **Made for the Waystone client, fine on any client.** A Waystone client is also told how
+  stormy the sky is apart from how much falls (a shower under a pale sky), how thick it falls
+  (a tempest twice as dense), and how long each change takes. A stock client ignores that part
+  of the packet.
 - **Weights mean what they say.** A state with 10% of a table's weight is in the sky about 10%
   of the time, including the heavy tiers that stepping would otherwise starve.
 - **Time of day.** Mist at dawn and after dark, thunder in the afternoon and evening.
@@ -72,7 +84,13 @@ The simplest setup is to keep no `.conf` and edit the installed `.conf.dist`.
 
 - Replace your `.conf` with the new `.conf.dist` and re-apply your own changes. An old `.conf`
   still loads, but it overrides the corrected profile data and the new defaults with the old
-  values.
+  values - and every profile table was reworked for the new states (Clear, Tempest, Blizzard)
+  and for its climate, so an old `.conf` keeps the old climate.
+- New in this version: `WeatherVibe.Client.*`, `WeatherVibe.Look.*`,
+  `WeatherVibe.Sound.SilentDrizzle`, the `Clear` / `Tempest` / `Blizzard` bands and holds,
+  `<Profile>.Lightning.Color`. **Thunder now defaults to the Waystone client's own**
+  (`WeatherVibe.Client.Thunder = client`): on a realm where some players use a stock client,
+  set it to `both` or they hear no thunder.
 - `Transition.SeasonBlendMinutes` is retired (seasons now blend by calendar). An old `.conf`
   that still has those lines logs "Found incorrect option" for each at startup; delete them.
 - `WeatherVibe.Debug` no longer prints anything to players. It writes to the server log.
@@ -107,12 +125,14 @@ weather are always GM-only; `reload` needs administrator level.
 | `.wvibe lightning` | Drop one lightning bolt beside you, whether strikes are switched on or not |
 | `.wvibe reload` | Re-read the config files and re-apply this module; running weather is kept |
 
-`<state>` is a number or a name: `0 Fine`, `1 Fog`, `3 LightRain`, `4 MediumRain`,
+`<state>` is a number or a name: `Clear`, `0 Fine`, `1 Fog`, `3 LightRain`, `4 MediumRain`,
 `5 HeavyRain`, `6 LightSnow`, `7 MediumSnow`, `8 HeavySnow`, `22 LightSandstorm`,
-`41 MediumSandstorm`, `42 HeavySandstorm`, `86 Thunders`, `ThunderSnow`, `DryThunders`.
+`41 MediumSandstorm`, `42 HeavySandstorm`, `86 Thunders`, `ThunderSnow`, `DryThunders`,
+`Tempest`, `Blizzard`.
 
 `86 Thunders` means the storm that suits the profile: a rainstorm where its tables have rain,
-thundersnow where they have only snow, a dry storm where they have neither.
+thundersnow where they have only snow, a dry storm where they have neither. `Tempest` means the
+worst of it: a tempest of rain, a blizzard, or the darkest dry storm.
 
 `set`, `force` and `setRaw` act on the whole profile, so synced zones stay in sync.
 
@@ -136,8 +156,14 @@ WeatherVibe.Profile.DunMorogh.Spring.4=40,6,30,70
 ```
 
 A row is one kind of weather: how often (its weight against the other rows) and how strong
-(a percentage range). For `Fine` the percentage is how clear the sky is: 100 is cloudless, low
-is overcast. A profile may leave a season out; it then borrows a neighbouring one.
+(a percentage range). For `Clear` and `Fine` the percentage is how clear the sky is: 100 is
+cloudless, low is as clouded as the state gets. A profile may leave a season out; it then
+borrows a neighbouring one.
+
+The kinds of weather, calmest to wildest: `Clear` (not a cloud; lasts, and only borders Fine
+and Fog), `Fine` (fair, some cloud), `Fog` (a grey, close sky), the light / medium / heavy tiers
+of rain, snow and sandstorm, the three thunder states, and at the top `Tempest` and `Blizzard`,
+reached only from the heaviest weather of their kind and gone again quickly.
 
 Per profile, under `WeatherVibe.Profile.<Name>.`:
 
@@ -145,12 +171,13 @@ Per profile, under `WeatherVibe.Profile.<Name>.`:
 |---|---|
 | `Transition.Max.Changes.Per.Hour` | How often the weather changes |
 | `Transition.MinHoldSeconds` | Least time weather stays once it has arrived |
-| `Transition.Step.TimeSeconds.Min/Max`, `Transition.StepSize.Perc` | How long a change of rain or sky takes: one step of time per `StepSize.Perc` of the range crossed. (Snow and sandstorm change in one client-side fade of a few seconds; see below) |
+| `Transition.Step.TimeSeconds.Min/Max`, `Transition.StepSize.Perc` | How long a change of rain, snow or sky takes: one step of time per `StepSize.Perc` of the range crossed. (A sandstorm changes in one client-side fade of a few seconds; see below) |
 | `Transition.Max.Consecutive.Same` | Same state in a row before a different one is wanted |
 | `DayPartWeight.<DAYPART>.<State>` | This profile's own time-of-day multiplier |
 | `Neighbors` | Profiles whose storms drift here |
 | `Thunder.Style` | What `86` means here: `auto` (from its tables), `rain`, `snow` or `dry` |
-| `Thunder.Sounds` | Its own thunderclaps (sound ids) instead of the global ones |
+| `Thunder.Sounds` | Its own thunderclaps (sound ids) instead of the global ones; on a Waystone client, its crack and its roll |
+| `Lightning.Color` | `0xRRGGBB`: its lightning on a Waystone client |
 | `Sandstorm.Skin`, `Rain.Skin` | What its sandstorm or rain looks like; see [Looks](#looks) |
 
 ### Where a profile applies
@@ -176,7 +203,11 @@ it. Ids are checked at startup, and anything unknown is reported in the server l
 | `WeatherVibe.Season.BlendDays` | 30 | Days either side of a season boundary over which tables mix. 0 = overnight |
 | `WeatherVibe.DayPartWeight.<DAYPART>.<State>` | see file | Time-of-day multiplier for all profiles |
 | `WeatherVibe.Intensity.InternalRange.<DAYPART>.<State>` | see file | The grade band a state's 0..100% maps onto; see [How the client draws weather](#how-the-client-draws-weather) |
-| `WeatherVibe.Sound.From.Light` / `.Medium` / `.Heavy` | 0.29 / 0.50 / 0.68 | The grade from which each sound loop is used. Below the first, precipitation is too thin to see and is sent as silent sky |
+| `WeatherVibe.Sound.From.Light` / `.Medium` / `.Heavy` | 0.29 / 0.50 / 0.68 | The grade from which each sound loop is used |
+| `WeatherVibe.Sound.SilentDrizzle` | 1 | Below the light loop, thin rain and snow are sent as the client's silent rows (2, 61): seen, not heard. 0 = plain sky |
+| `WeatherVibe.Client.Extension` | 1 | Append the Waystone client's extension block; see [The Waystone client](#the-waystone-client) |
+| `WeatherVibe.Client.Thunder` | client | Who makes thunder and lightning: `client`, `server` or `both` |
+| `WeatherVibe.Look.*` | see file | What a Waystone client is shown per state: sky, density, lightning, storm, duck; distant storms |
 | `WeatherVibe.Holiday.<holidayId>.<Profile>.<N>` | see file | Extra rows while a holiday runs |
 | `WeatherVibe.Remarks.*` | on, 15%, 30 min | NPC remarks and their lines |
 | `WeatherVibe.Hook.Enable` / `.ResyncMinutes` | 1 / 10 | The weather-change hook for other scripts |
@@ -190,12 +221,44 @@ it. Ids are checked at startup, and anything unknown is reported in the server l
 ### Thunder and lightning
 
 A storm is drawn by the client as rain, snow or the darkest sky, as hard as its grade says.
-The thunder is played by the server: one clap at a time, the same for everyone in that
-weather. It is on by default. Audition a clap sound with the core's `.debug play sound <id>`.
+Who makes the thunder is `WeatherVibe.Client.Thunder`:
 
-Lightning is off by default. When on, a clap may come with a bolt: a stock game object with a
-lightning model and its own thunder that fades with distance, placed 35–90 yd from a player on
+| Value | Waystone client | Stock client |
+|---|---|---|
+| `client` (default) | Its own lightning and layered thunder, rate and violence from `Look.<State>.Lightning` / `.Storm` | No thunder |
+| `server` | The server's claps, no lightning | The server's claps |
+| `both` | Flashes with the server's claps; its own thunder muted | The server's claps |
+
+The server cannot tell the two clients apart, so this is one setting for the realm.
+
+The server's thunder: one clap at a time, the same for everyone in that weather, with the
+client's long distant-thunder bed under it. Audition a clap with the core's
+`.debug play sound <id>`. The server's lightning bolts are off by default: a clap may come with
+a stock game object with a lightning model and its own thunder, placed 35–90 yd from a player on
 open ground and removed after a few seconds. Run `.wvibe lightning` to see one before deciding.
+
+### The Waystone client
+
+The Waystone client (`CLIENT/wowdecomp - MODIFIED`) reads an extension block after the stock
+packet fields; a stock client skips it, so it is always sent (`Client.Extension = 0` stops it).
+What it adds, per state and from `WeatherVibe.Look.*`:
+
+- **The sky apart from the rain.** The stock client is fully stormy at the first drop. Here a
+  shower starts under a sky half as dark and darkens as more falls (`Look.Sky.*`); a storm is
+  dark from the start. Clouding over before rain meets the rain's own sky, so nothing jumps.
+- **Density.** Heavy weather a little thicker, a `Tempest` or `Blizzard` up to twice as thick
+  as the stock client can draw.
+- **Transitions.** Each streamed step is told to take one tick, so a change is one continuous
+  move; a sandstorm's single packet carries its whole fade.
+- **Lightning.** While a storm is up, strikes per minute and how violent (`Look.<State>.Lightning`,
+  `.Storm`). While one is coming or going, or up in a neighbouring profile, far-off flashes and a
+  low rumble (`Look.DistantStorm.*`). Per profile, its colour (`Lightning.Color`) and its
+  thunder sounds (`Thunder.Sounds`).
+- **Duck.** Under a tempest, a blizzard or a heavy sandstorm the zone's own ambience is turned
+  well down.
+
+The Waystone client's own weather settings (`/weather`, the `weather*` CVars) still apply on
+top: its volume, thunder level, lightning brightness and so on are the player's.
 
 ### Looks
 
@@ -255,8 +318,9 @@ end)
 The event repeats every `Hook.ResyncMinutes`, so a script loaded with `.reload ale` learns the
 current weather without waiting for it to change. Battleground and raid zones do not fire it.
 
-`state` is the module's state, not what the client is drawing: any kind of thunder is reported
-as 86, and a skinned sandstorm is still 22, 41 or 42.
+`state` is the module's state, not what the client is drawing: any kind of thunder (a tempest
+too) is reported as 86, `Clear` as 0, a `Blizzard` as 8, and a skinned sandstorm is still 22,
+41 or 42.
 
 Do not set weather from Lua with `Map:SetWeather`. It creates a core weather object that keeps
 regenerating on its own and fights this module in that zone. Use `.wvibe force` or `.wvibe set`.
@@ -282,20 +346,24 @@ same raindrops with three different sounds; Fine and Fog are the same sky.
 Two more things the client does:
 
 - It **fades by itself**, at a tenth of the grade per second.
-- It **restarts snow and sandstorms every time it is told about them**, even if nothing
-  changed: they fade out, are rebuilt, and fade back in. Rain is updated in place.
+- It **restarts a sandstorm every time it is told about one**, even if nothing changed: it
+  fades out, is rebuilt, and fades back in. Rain and snow are updated in place. (Its weather
+  table has no default texture for sand, so every packet looks like a new one. The Waystone
+  client fixes this, but the server cannot tell who is on which client.)
 
 What the module does about it:
 
 - A state's band (`InternalRange`) puts skies inside 0–0.25 and precipitation above it.
-- The id is chosen for its sound, by how much is falling (`Sound.From.*`). Rain too thin to
-  see is sent as plain sky, so it is never heard first.
-- Rain and the sky are moved in small steps. Snow and sandstorm are sent once, with the grade
-  they are going to, and never repeated: not on a timer, not when you cross into another zone
-  with the same weather, and not when a profile picks the same snow again.
+- The id is chosen for its sound, by how much is falling (`Sound.From.*`). Below the light
+  loop, thin rain and snow are sent as the client's silent rain and snow rows (2 and 61), so a
+  drizzle can be seen without being heard, and nothing is ever heard before it can be seen.
+- Rain, snow and the sky are moved in small steps. A sandstorm is sent once, with the grade it
+  is going to, and never repeated: not on a timer, not when you cross into another zone with
+  the same weather, and not when a profile picks the same sandstorm again.
+- After a loading screen or a login the weather is sent abruptly, so it is already there.
 
-The consequence to know about: **snow and sandstorms do not build up slowly.** They arrive in
-a fade of a few seconds and change the same way. Rain does build.
+The consequence to know about: **sandstorms do not build up slowly.** They arrive in a fade of
+a few seconds and change the same way. Rain and snow do build.
 
 ## Calibrating to your client
 
@@ -305,12 +373,14 @@ zone; `.wvibe status here` shows the id and grade being sent at each step:
 
 | Try | Look for | If not |
 |---|---|---|
-| `.wvibe setRaw <zone> 3 0.25`, then `0.29`, then `0.35` | Nothing falling and silence; the first thin rain with a quiet loop; plainly raining | If rain is not yet visible at 0.29, raise `Sound.From.Light` to where it first shows (and the light bands' minimums with it) |
+| `.wvibe setRaw <zone> 3 0.25`, then `0.27`, `0.29`, `0.35` | Nothing falling and silence; a few silent drops; the first thin rain with a quiet loop; plainly raining | If the loop starts before the rain is plain to see, raise `Sound.From.Light` |
 | `.wvibe setRaw <zone> 3 0.49`, then `0.51`; `0.67`, then `0.69` | The loop steps up as the rain does | Move `Sound.From.Medium` / `.Heavy` to where each loop suits the rain |
 | `.wvibe setRaw <zone> 0 0.0`, then `0 0.125`, then `0 0.25` | Clear; lightly clouded; a full storm sky, nothing falling | That zone has no storm sky (about half do not); nothing to tune |
 | `.wvibe force here 0 0` | As dull as a fine day gets. Bright enough? | Lower the `Fine` band's maximum (brighter) or raise it towards 0.25 (gloomier) |
-| `.wvibe force here 7 60` in a snow zone | Snow arrives once and stays put | If it comes and goes, something else is sending weather: see Troubleshooting |
-| `.wvibe force here 86 80` | A downpour with thunder every half minute or so | `Thunder.IntervalSeconds`, `Thunder.Sounds.*`, the `Thunders` range |
+| `.wvibe force here 7 60` in a snow zone, from clear | The sky clouds over, a few flakes, then the snow thickens, without a fade-out | If it comes and goes, something else is sending weather: see Troubleshooting |
+| `.wvibe force here 86 80` | A downpour with thunder: the Waystone client's lightning, or (Client.Thunder = server) a clap every half minute or so | `Look.Thunders.*`; `Thunder.IntervalSeconds`, `Thunder.Sounds.*` |
+| `.wvibe force here 5 90`, then `.wvibe force here Tempest 100` | The absolute storm: on Waystone twice the rain, lightning every few seconds, most of it close | `Look.Tempest.*` |
+| `.wvibe force here Clear 100` | Not a cloud in the sky | That zone's light has no storm sky to clear; nothing to tune |
 | `.wvibe audition 104 0.6`, then `103`, `90`, `100` | Whether you like each look | Leave the skins off |
 | `.wvibe lightning` | A bolt and its thunder | Try `Lightning.GameObject = 183356`, or leave strikes off |
 
@@ -348,14 +418,18 @@ sound-effects volume.
 old intensity bands. See "Upgrading from an older version"; the server log names each band at
 startup.
 
-**Snow or a sandstorm fades out and comes back.** The client does that whenever it receives a
-packet about snow or sand. The module sends one per real change, so something else is
-sending: `ActivateWeather` still 1, a script calling `Map:SetWeather`, or
-`WeatherVibe.Profile.ReApply.PerSec` set in an old version (it no longer repeats snow).
-One fade when the snow really changes strength is the client's own and cannot be avoided.
+**A sandstorm fades out and comes back.** The stock client does that whenever it receives a
+packet about sand. The module sends one per real change, so something else is sending:
+`ActivateWeather` still 1, a script calling `Map:SetWeather`, or
+`WeatherVibe.Profile.ReApply.PerSec` set in an old version. One fade when the sandstorm
+really changes strength is the client's own and cannot be avoided.
 
-**Snow appears all at once instead of building up.** Yes; see
-[How the client draws weather](#how-the-client-draws-weather). Rain builds; snow cannot.
+**A sandstorm appears all at once instead of building up.** Yes; see
+[How the client draws weather](#how-the-client-draws-weather). Rain and snow build; sand cannot.
+
+**No thunder at all.** On a stock client with `WeatherVibe.Client.Thunder = client` that is
+expected: set `both`. On a Waystone client, its `weatherLightning` / `weatherThunder` CVars may
+be off.
 
 **A storm is only a drizzle.** Your `.conf` still has an old `Thunders` range (0.15–0.40).
 
